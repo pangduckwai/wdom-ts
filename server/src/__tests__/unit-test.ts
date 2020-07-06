@@ -1,6 +1,6 @@
 require('dotenv').config();
 import RedisClient, { Redis } from 'ioredis';
-import { CHANNEL, CommitsDS } from '../data-src';
+import { CHANNEL, Commits } from '../data-src';
 import { Commands, Commit } from '../model';
 
 const host = process.env.REDIS_HOST;
@@ -12,7 +12,6 @@ let players: Record<string, Commit>;
 let games: Record<string, Commit>;
 let publisher: Redis;
 let subscriber: Redis;
-let dataSrc: CommitsDS;
 let cutoff: number;
 
 beforeAll(async () => {
@@ -61,16 +60,15 @@ beforeAll(async () => {
 	commits.push(Commands.StartGame({ playerToken: players['pete'].id }));
 
 	await new Promise((resolve) => setTimeout(() => resolve(), 100));
-	dataSrc = new CommitsDS(publisher);
 
 	let count = 0;
 	for (const commit of commits) {
 		count ++;
-		await dataSrc.put(commit);
-		await new Promise((resolve) => setTimeout(() => resolve(), 300));
+		await Commits.put(publisher, commit);
+		await new Promise((resolve) => setTimeout(() => resolve(), 100));
 		if (count === 14) {
 			cutoff = Date.now();
-			await new Promise((resolve) => setTimeout(() => resolve(), 150));
+			await new Promise((resolve) => setTimeout(() => resolve(), 50));
 		}
 	}
 });
@@ -95,12 +93,12 @@ describe('Unit Test', () => {
 	});
 
 	it('read commits after a timestamp', async () => {
-		const received = await dataSrc.get({ fromTime: cutoff });
+		const received = await Commits.get(publisher, { fromTime: cutoff });
 		expect(received.length).toEqual(11);
 	});
 
 	it('read commits before a timestamp', async () => {
-		const received = await dataSrc.get({ toTime: cutoff });
+		const received = await Commits.get(publisher, { toTime: cutoff });
 		expect(received.length).toEqual(14);
 	});
 
@@ -117,7 +115,7 @@ describe('Unit Test', () => {
 
 		await subscriber.subscribe(CHANNEL);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
-		await dataSrc.put(commit);
+		await Commits.put(publisher, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 300));
 		expect(chnl).toEqual(CHANNEL);
 		expect(JSON.parse(mssg)).toEqual({ id: commit.id, timestamp: commit.timestamp });
@@ -126,9 +124,9 @@ describe('Unit Test', () => {
 	it('read commit by id (using index)', async () => {
 		const commit = Commands.RegisterPlayer({ playerName: 'patt' });
 
-		await dataSrc.put(commit);
+		await Commits.put(publisher, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
-		const received = await dataSrc.get({ id: commit.id });
+		const received = await Commits.get(publisher, { id: commit.id });
 		expect(received[0]).toEqual(commit);
 	});
 });
