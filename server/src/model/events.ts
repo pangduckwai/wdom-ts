@@ -28,7 +28,6 @@ export interface GameClosed extends BaseEvent {
 	readonly type: 'GameClosed';
 	payload: {
 		playerToken: string;
-		gameToken: string;
 	}
 }
 
@@ -44,7 +43,6 @@ export interface GameQuitted extends BaseEvent {
 	readonly type: 'GameQuitted';
 	payload: {
 		playerToken: string;
-		gameToken: string;
 	}
 }
 
@@ -52,7 +50,6 @@ export interface GameStarted extends BaseEvent {
 	readonly type: 'GameStarted';
 	payload: {
 		playerToken: string;
-		gameToken: string;
 	}
 }
 // ************************

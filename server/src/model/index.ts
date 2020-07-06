@@ -7,7 +7,7 @@ export interface BaseEvent {
 
 export interface Commit {
 	id: string;
-	timestamp: number;
+	timestamp?: number;
 	version: number;
 	events: BaseEvent[];
 }
@@ -15,7 +15,6 @@ export interface Commit {
 export const isCommit = (variable: any): variable is Commit => {
 	const val = variable as Commit;
 	return (val.id !== undefined) &&
-		(val.timestamp !== undefined) &&
 		(val.version !== undefined) &&
 		(val.events && (val.events.length > 0));
 }
@@ -25,7 +24,6 @@ export const generateToken = (timestamp: number) =>
 
 export * from './events';
 export * from './commands';
-export * from './source';
 
 // export type BaseCommands<T> = {
 // 	[C in keyof T]: (command: T[C]) => Promise<Commit>;

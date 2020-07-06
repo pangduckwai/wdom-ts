@@ -6,105 +6,63 @@ import {
 	SetupFinished, TurnEnded, CardReturned, CardsRedeemed, GameWon
 } from '.';
 
-const buildCommit = <E extends BaseEvent>(events: E[]) => {
+const buildCommit = <E extends BaseEvent>(events: E[]): Commit => {
 	if (!events || (events.length < 1)) throw new Error('[buildCommit] Invalid parameter(s)');
 	const stamp = Date.now()
 	return {
 		id: generateToken(stamp),
-		timestamp: stamp,
 		version: 0,
 		events,
 	}
 };
 
 export const Commands = {
-	RegisterPlayer: async (payload: { playerName: string }) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<PlayerRegistered>([{
-				type: 'PlayerRegistered',
-				payload
-			}]));
-		}),
-	PlayerLeave: async (payload: { playerToken: string }) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<PlayerLeft>([{
-				type: 'PlayerLeft',
-				payload
-			}]));
-		}),
-	OpenGame: async (payload: {
-		playerToken: string;
-		gameName: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<GameOpened>([{
-				type: 'GameOpened',
-				payload
-			}]));
-		}),
-	CloseGame: async (payload: {
-		playerToken: string;
-		gameToken: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<GameClosed>([{
-				type: 'GameClosed',
-				payload
-			}]));
-		}),
-	JoinGame: async (payload: {
-		playerToken: string;
-		gameToken: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<GameJoined>([{
-				type: 'GameJoined',
-				payload
-			}]));
-		}),
-	QuitGame: async (payload: {
-		playerToken: string;
-		gameToken: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<GameQuitted>([{
-				type: 'GameQuitted',
-				payload
-			}]));
-		}),
-	StartGame: async (payload: {
-		playerToken: string;
-		gameToken: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<GameStarted>([{
-				type: 'GameStarted',
-				payload
-			}]));
-		}),
-	AssignTerritory: async (payload: {
-		playerToken: string;
-		gameToken: string;
-		territoryName: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<TerritoryAssigned>([{
-				type: 'TerritoryAssigned',
-				payload
-			}]));
-		}),
-	SelectTerritory: async (payload: {
-		playerToken: string;
-		gameToken: string;
-		territoryName: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<TerritorySelected>([{
-				type: 'TerritorySelected',
-				payload
-			}]));
-		}),
-	AttackTerritory: async (payload: {
+	RegisterPlayer: (payload: { playerName: string }) =>
+		buildCommit<PlayerRegistered>([{
+			type: 'PlayerRegistered',
+			payload
+		}]),
+	PlayerLeave: (payload: { playerToken: string }) =>
+		buildCommit<PlayerLeft>([{
+			type: 'PlayerLeft',
+			payload
+		}]),
+	OpenGame: (payload: { playerToken: string; gameName: string }) =>
+		buildCommit<GameOpened>([{
+			type: 'GameOpened',
+			payload
+		}]),
+	CloseGame: (payload: { playerToken: string }) =>
+		buildCommit<GameClosed>([{
+			type: 'GameClosed',
+			payload
+		}]),
+	JoinGame: (payload: { playerToken: string; gameToken: string }) =>
+		buildCommit<GameJoined>([{
+			type: 'GameJoined',
+			payload
+		}]),
+	QuitGame: (payload: { playerToken: string }) =>
+		buildCommit<GameQuitted>([{
+			type: 'GameQuitted',
+			payload
+		}]),
+	StartGame: (payload: { playerToken: string }) =>
+		buildCommit<GameStarted>([{
+			type: 'GameStarted',
+			payload
+		}]),
+	AssignTerritory: (payload: { playerToken: string; gameToken: string; territoryName: string }) =>
+		buildCommit<TerritoryAssigned>([{
+			type: 'TerritoryAssigned',
+			payload
+		}]),
+	SelectTerritory: (payload: { playerToken: string; gameToken: string; territoryName: string }) =>
+		buildCommit<TerritorySelected>([{
+			type: 'TerritorySelected',
+			payload
+		}]),
+	AttackTerritory: (payload: {
 		playerToken: string;
 		gameToken: string;
 		fromTerritory: string;
@@ -112,132 +70,75 @@ export const Commands = {
 		attackerLoss: number;
 		defenderLoss: number;
 	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<TerritoryAttacked>([{
-				type: 'TerritoryAttacked',
-				payload
-			}]));
-		}),
-	ConquerTerritory: async (payload: {
+		buildCommit<TerritoryAttacked>([{
+			type: 'TerritoryAttacked',
+			payload
+		}]),
+	ConquerTerritory: (payload: {
 		fromPlayer: string;
 		toPlayer: string;
 		gameToken: string;
 		fromTerritory: string;
 		toTerritory: string;
 	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<TerritoryConquered>([{
-				type: 'TerritoryConquered',
-				payload
-			}]));
-		}),
-	Fortify: async (payload: {
+		buildCommit<TerritoryConquered>([{
+			type: 'TerritoryConquered',
+			payload
+		}]),
+	Fortify: (payload: {
 		playerToken: string;
 		gameToken: string;
 		fromTerritory: string;
 		toTerritory: string;
 		amount: number;
 	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<TerritoryFortified>([{
-				type: 'TerritoryFortified',
-				payload
-			}]));
-		}),
-	DefeatPlayer: async (payload: {
-		fromPlayer: string;
-		toPlayer: string;
-		gameToken: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<PlayerDefeated>([{
-				type: 'PlayerDefeated',
-				payload
-			}]));
-		}),
-	PlaceTroop: async (payload: {
-		playerToken: string;
-		gameToken: string;
-		territoryName: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<TroopPlaced>([{
-				type: 'TroopPlaced',
-				payload
-			}]));
-		}),
-	AddTroop: async (payload: {
-		playerToken: string;
-		gameToken: string;
-		territoryName: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<TroopAdded>([{
-				type: 'TroopAdded',
-				payload
-			}]));
-		}),
-	NextPlayer: async (payload: {
-		fromPlayer: string;
-		toPlayer: string;
-		gameToken: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<NextPlayer>([{
-				type: 'NextPlayer',
-				payload
-			}]));
-		}),
-	FinishSetup: async (payload: {
-		playerToken: string;
-		gameToken: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<SetupFinished>([{
-				type: 'SetupFinished',
-				payload
-			}]));
-		}),
-	EndTurn: async (payload: {
-		playerToken: string;
-		gameToken: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<TurnEnded>([{
-				type: 'TurnEnded',
-				payload
-			}]));
-		}),
-	ReturnCard: async (payload: {
-		playerToken: string;
-		gameToken: string;
-		cardName: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<CardReturned>([{
-				type: 'CardReturned',
-				payload
-			}]));
-		}),
-	RedeemCards: async (payload: {
-		playerToken: string;
-		gameToken: string;
-		cardNames: string[];
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<CardsRedeemed>([{
-				type: 'CardsRedeemed',
-				payload
-			}]));
-		}),
-	WinGame: async (payload: {
-		playerToken: string;
-		gameToken: string;
-	}) =>
-		new Promise<Commit>((resolve, _) => {
-			resolve(buildCommit<GameWon>([{
-				type: 'GameWon',
-				payload
-			}]));
-		}),
+		buildCommit<TerritoryFortified>([{
+			type: 'TerritoryFortified',
+			payload
+		}]),
+	DefeatPlayer: (payload: { fromPlayer: string; toPlayer: string; gameToken: string }) =>
+		buildCommit<PlayerDefeated>([{
+			type: 'PlayerDefeated',
+			payload
+		}]),
+	PlaceTroop: (payload: { playerToken: string; gameToken: string; territoryName: string }) =>
+		buildCommit<TroopPlaced>([{
+			type: 'TroopPlaced',
+			payload
+		}]),
+	AddTroop: (payload: { playerToken: string; gameToken: string; territoryName: string }) =>
+		buildCommit<TroopAdded>([{
+			type: 'TroopAdded',
+			payload
+		}]),
+	NextPlayer: (payload: { fromPlayer: string; toPlayer: string; gameToken: string }) =>
+		buildCommit<NextPlayer>([{
+			type: 'NextPlayer',
+			payload
+		}]),
+	FinishSetup: (payload: { playerToken: string; gameToken: string }) =>
+		buildCommit<SetupFinished>([{
+			type: 'SetupFinished',
+			payload
+		}]),
+	EndTurn: (payload: { playerToken: string; gameToken: string }) =>
+		buildCommit<TurnEnded>([{
+			type: 'TurnEnded',
+			payload
+		}]),
+	ReturnCard: (payload: { playerToken: string; gameToken: string; cardName: string }) =>
+		buildCommit<CardReturned>([{
+			type: 'CardReturned',
+			payload
+		}]),
+	RedeemCards: (payload: { playerToken: string; gameToken: string; cardNames: string[] }) =>
+		buildCommit<CardsRedeemed>([{
+			type: 'CardsRedeemed',
+			payload
+		}]),
+	WinGame: (payload: { playerToken: string; gameToken: string }) =>
+		buildCommit<GameWon>([{
+			type: 'GameWon',
+			payload
+		}]),
 };
