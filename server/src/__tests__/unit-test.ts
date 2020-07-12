@@ -1,13 +1,14 @@
 require('dotenv').config();
 import RedisClient, { Redis } from 'ioredis';
-import { CHANNEL, Commits } from '../data-src';
-import { Commands, Commit } from '../model';
+import { Commits, Continents } from '../data';
+import { CHANNEL, CHANNEL_IDX, Commands, Commit } from '../model';
 
 const host = process.env.REDIS_HOST;
 const port = (process.env.REDIS_PORT || 6379) as number;
 const timestamp = Date.now();
 const mockInSubscriber = jest.fn();
 const commits: Commit[] = [];
+
 let players: Record<string, Commit>;
 let games: Record<string, Commit>;
 let publisher: Redis;
@@ -82,7 +83,30 @@ afterAll(async () => {
 	}, 1000));
 });
 
-describe('Unit Test', () => {
+describe('Misc tests', () => {
+	it('test enum with for-in-loop', () => {
+		const result = [];
+		for (const item in Continents) {
+			result.push(Continents[item as keyof typeof Continents]);
+		}
+		console.log(result);
+		expect(result.length).toEqual(6);
+	});
+
+	it('test enum with Object.keys() and Array.map()', () => {
+		const result = Object.keys(Continents).map(key => Continents[key as keyof typeof Continents])
+		console.log(result);
+		expect(result.length).toEqual(6);
+	});
+
+	it('test enum with Object.values()!!!', () => {
+		const result = Object.values(Continents);
+		console.log(result);
+		expect(result.length).toEqual(6);
+	});
+});
+
+describe('Unit tests with redis', () => {
 	it('connect to redis', async () => {
 		await publisher.incr(`counter${timestamp}`);
 		await publisher.incr(`counter${timestamp}`);
@@ -92,7 +116,7 @@ describe('Unit Test', () => {
 		expect(result).toEqual('2');
 	});
 
-	it('read commits after a timestamp', async () => {
+	it('read commits after a time', async () => {
 		const received = await Commits.get(publisher, { fromTime: cutoff });
 		expect(received.length).toEqual(11);
 	});
@@ -115,10 +139,10 @@ describe('Unit Test', () => {
 
 		await subscriber.subscribe(CHANNEL);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
-		await Commits.put(publisher, commit);
+		const timestamp = await Commits.put(publisher, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 300));
 		expect(chnl).toEqual(CHANNEL);
-		expect(JSON.parse(mssg)).toEqual({ id: commit.id, timestamp: commit.timestamp });
+		expect(JSON.parse(mssg)).toEqual({ id: commit.id, timestamp });
 	});
 
 	it('read commit by id (using index)', async () => {
@@ -127,6 +151,44 @@ describe('Unit Test', () => {
 		await Commits.put(publisher, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
 		const received = await Commits.get(publisher, { id: commit.id });
-		expect(received[0]).toEqual(commit);
+		expect({
+			id: received[0].id,
+			version: received[0].version,
+			events: received[0].events
+		}).toEqual(commit);
+	});
+
+	it('fail to put duplicated commit', async () => {
+		const commit = Commands.RegisterPlayer({ playerName: 'patt' });
+
+		await Commits.put(publisher, commit);
+		await new Promise((resolve) => setTimeout(() => resolve(), 100));
+
+		await expect(Commits.put(publisher, commit)).rejects.toThrow(/\[Commits[.]write\] commit \{.*\} already exists/); // already exists
+	});
+
+	it('fail to get commit by non-existing id', async () => {
+		const id = 'abcd1234';
+		await expect(Commits.get(publisher, { id })).rejects.toThrow(`[Commits.get] Commit ID ${id} not found in index`);
+	});
+
+	it ('read objects of unknown type from redis', async () => {
+		const fakeJson = '{"commitId":"12345","version":0,"events":["hello"]}';
+		await publisher.zadd(CHANNEL, timestamp, fakeJson);
+		const idx1 = await publisher.zrank(CHANNEL, fakeJson);
+		if (idx1 !== null) {
+			await publisher.hset(CHANNEL_IDX, '12345', idx1);
+		}
+		await expect(Commits.get(publisher, { id: '12345' })).rejects.toThrow(`[Commits.get] Unknown object type ${fakeJson}`);
+	});
+
+	it ('read non-JSON data from redis', async () => {
+		const fakeStrg = 'This is not JSON';
+		await publisher.zadd(CHANNEL, timestamp, fakeStrg);
+		const idx2 = await publisher.zrank(CHANNEL, fakeStrg);
+		if (idx2 !== null) {
+			await publisher.hset(CHANNEL_IDX, '12346', idx2);
+		}
+		await expect(Commits.get(publisher, { id: '12346' })).rejects.toThrow(`Unexpected token T in JSON at position 0`);
 	});
 });

@@ -1,7 +1,7 @@
 import { DataSource } from 'apollo-datasource';
 import { Redis } from 'ioredis';
-import { Commit, isCommit } from '../model';
-import { CHANNEL, isNotification, Notification } from '.';
+import { CHANNEL, isNotification, toCommits } from '../model';
+import { reducer } from './reducer';
 
 export class EntitiesDS extends DataSource {
 	constructor(private client: Redis) {
@@ -24,7 +24,17 @@ export class EntitiesDS extends DataSource {
 			try {
 				const noti = JSON.parse(message);
 				if (isNotification(noti)) {
-					reducer(this.client, channel, noti, this.lastPos);
+					this.client.zrangebyscore(
+						channel, (this.lastPos >= 0) ? this.lastPos : '-inf', noti.timestamp, 'WITHSCORES', (error, result) => {
+							if (error) {
+								console.log(`[EntitiesDS.subscriber.on - message]: ${error}`);
+							} else {
+								const incomings = toCommits('[EntitiesDS.subscriber.on - message]', result);
+								reducer(this.client, channel, incomings);
+							}
+						}
+					);
+					this.lastPos = noti.timestamp;
 				}
 			} catch (error) {
 				console.log(`[EntitiesDS.initialize] parse error: ${error}`);
@@ -46,18 +56,4 @@ export class EntitiesDS extends DataSource {
 		this.subscriber.unsubscribe(CHANNEL);
 		this.subscriber.quit();
 	}
-}
-
-const reducer = async (client: Redis, channel: string, notification: Notification, lastPosition: number) => {
-	const incomings = await (await client.zrangebyscore(channel, (lastPosition >= 0) ? lastPosition : '-inf', notification.timestamp)).map(str => {
-		try {
-			const incoming = JSON.parse(str);
-			if (isCommit(incoming))
-				return incoming;
-			else
-				return new Error(`Unknow type ${str}`);
-		} catch (error) {
-			return error;
-		}
-	});
 }
