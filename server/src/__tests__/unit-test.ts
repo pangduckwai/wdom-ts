@@ -1,7 +1,8 @@
 require('dotenv').config();
 import RedisClient, { Redis } from 'ioredis';
-import { Commits, Continents } from '../data';
-import { CHANNEL, CHANNEL_IDX, Commands, Commit } from '../model';
+import { buildContinents, buildDeck, buildMap, Continents, Territories, WildCards } from '../entities';
+import { Commands, Commit } from '../commits';
+import { CHANNEL, CHANNEL_IDX, CommitStore } from '..';
 
 const host = process.env.REDIS_HOST;
 const port = (process.env.REDIS_PORT || 6379) as number;
@@ -65,7 +66,7 @@ beforeAll(async () => {
 	let count = 0;
 	for (const commit of commits) {
 		count ++;
-		await Commits.put(publisher, commit);
+		await CommitStore.put(publisher, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
 		if (count === 14) {
 			cutoff = Date.now();
@@ -104,6 +105,50 @@ describe('Misc tests', () => {
 		console.log(result);
 		expect(result.length).toEqual(6);
 	});
+
+	it('test cloning Record<K,T>', () => {
+		const con1 = buildContinents();
+		const con2 = buildContinents();
+		con1.Europe.reinforcement = 9;
+		expect(con2.Europe.reinforcement).toEqual(5);
+	});
+
+	it('test cloning Record<K,T> again', () => {
+		const con1 = buildContinents();
+		const con2 = buildContinents();
+		con1[Continents.Asia].reinforcement = 3;
+		expect(con2[Continents.Asia].reinforcement).toEqual(7);
+	});
+
+	it('test Continents initialized properly', () => {
+		const world = buildContinents();
+		let count = 0;
+		for (const key of Object.keys(Continents)) {
+			if (Continents[key as keyof typeof Continents] === world[Continents[key as keyof typeof Continents]].name) count ++;
+		}
+		expect(count).toEqual(6);
+	});
+
+	it('test Map initialized properly', () => {
+		const map = buildMap();
+		let count = 0;
+		for (const key of Object.keys(Territories)) {
+			if (Territories[key as keyof typeof Territories] === map[Territories[key as keyof typeof Territories]].name) count ++;
+		}
+		expect(count).toEqual(42);
+	});
+
+	it('test Card deck initialized properly', () => {
+		const deck = buildDeck();
+		let count = 0;
+		for (const key of Object.keys(WildCards)) {
+			if (WildCards[key as keyof typeof WildCards] === deck[WildCards[key as keyof typeof WildCards]].name) count ++
+		}
+		for (const key of Object.keys(Territories)) {
+			if (Territories[key as keyof typeof Territories] === deck[Territories[key as keyof typeof Territories]].name) count ++
+		}
+		expect(count).toEqual(44);
+	});
 });
 
 describe('Unit tests with redis', () => {
@@ -117,12 +162,12 @@ describe('Unit tests with redis', () => {
 	});
 
 	it('read commits after a time', async () => {
-		const received = await Commits.get(publisher, { fromTime: cutoff });
+		const received = await CommitStore.get(publisher, { fromTime: cutoff });
 		expect(received.length).toEqual(11);
 	});
 
 	it('read commits before a timestamp', async () => {
-		const received = await Commits.get(publisher, { toTime: cutoff });
+		const received = await CommitStore.get(publisher, { toTime: cutoff });
 		expect(received.length).toEqual(14);
 	});
 
@@ -139,7 +184,7 @@ describe('Unit tests with redis', () => {
 
 		await subscriber.subscribe(CHANNEL);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
-		const timestamp = await Commits.put(publisher, commit);
+		const timestamp = await CommitStore.put(publisher, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 300));
 		expect(chnl).toEqual(CHANNEL);
 		expect(JSON.parse(mssg)).toEqual({ id: commit.id, timestamp });
@@ -148,9 +193,9 @@ describe('Unit tests with redis', () => {
 	it('read commit by id (using index)', async () => {
 		const commit = Commands.RegisterPlayer({ playerName: 'patt' });
 
-		await Commits.put(publisher, commit);
+		await CommitStore.put(publisher, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
-		const received = await Commits.get(publisher, { id: commit.id });
+		const received = await CommitStore.get(publisher, { id: commit.id });
 		expect({
 			id: received[0].id,
 			version: received[0].version,
@@ -161,15 +206,15 @@ describe('Unit tests with redis', () => {
 	it('fail to put duplicated commit', async () => {
 		const commit = Commands.RegisterPlayer({ playerName: 'patt' });
 
-		await Commits.put(publisher, commit);
+		await CommitStore.put(publisher, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
 
-		await expect(Commits.put(publisher, commit)).rejects.toThrow(/\[Commits[.]write\] commit \{.*\} already exists/); // already exists
+		await expect(CommitStore.put(publisher, commit)).rejects.toThrow(/\[CommitStore[.]write\] commit \{.*\} already exists/); // already exists
 	});
 
 	it('fail to get commit by non-existing id', async () => {
 		const id = 'abcd1234';
-		await expect(Commits.get(publisher, { id })).rejects.toThrow(`[Commits.get] Commit ID ${id} not found in index`);
+		await expect(CommitStore.get(publisher, { id })).rejects.toThrow(`[CommitStore.get] Commit ID ${id} not found in index`);
 	});
 
 	it ('read objects of unknown type from redis', async () => {
@@ -179,7 +224,7 @@ describe('Unit tests with redis', () => {
 		if (idx1 !== null) {
 			await publisher.hset(CHANNEL_IDX, '12345', idx1);
 		}
-		await expect(Commits.get(publisher, { id: '12345' })).rejects.toThrow(`[Commits.get] Unknown object type ${fakeJson}`);
+		await expect(CommitStore.get(publisher, { id: '12345' })).rejects.toThrow(`[CommitStore.get] Unknown object type ${fakeJson}`);
 	});
 
 	it ('read non-JSON data from redis', async () => {
@@ -189,6 +234,6 @@ describe('Unit tests with redis', () => {
 		if (idx2 !== null) {
 			await publisher.hset(CHANNEL_IDX, '12346', idx2);
 		}
-		await expect(Commits.get(publisher, { id: '12346' })).rejects.toThrow(`Unexpected token T in JSON at position 0`);
+		await expect(CommitStore.get(publisher, { id: '12346' })).rejects.toThrow(`Unexpected token T in JSON at position 0`);
 	});
 });

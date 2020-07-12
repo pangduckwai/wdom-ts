@@ -1,23 +1,10 @@
 import crypto from 'crypto';
-import { Redis } from 'ioredis';
 
 export * from './events';
 export * from './commands';
 
 export const generateToken = (timestamp: number) =>
 	crypto.createHash('sha256').update('' + (timestamp + Math.floor(Math.random()*10000))).digest('base64');
-
-export const CHANNEL = `wdom${Date.now()}`;
-
-export const CHANNEL_IDX = `${CHANNEL}idx`;
-// export const CHANNEL_PLAYER = `${CHANNEL}ply`;
-// export const CHANNEL_GAME = `${CHANNEL}gam`;
-
-export type Reducer = (
-	client: Redis,
-	channel: string,
-	commits: Commit[]
-) => Promise<any>;
 
 // ============================
 // === Event Sourcing types ===

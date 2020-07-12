@@ -1,9 +1,10 @@
 import { DataSource } from 'apollo-datasource';
 import { Redis } from 'ioredis';
-import { CHANNEL, isNotification, toCommits } from '../model';
-import { reducer } from './reducer';
+import { reducer } from './entities';
+import { isNotification, toCommits } from './commits';
+import { CHANNEL } from '.';
 
-export class EntitiesDS extends DataSource {
+export class EntityDS extends DataSource {
 	constructor(private client: Redis) {
 		super();
 	}

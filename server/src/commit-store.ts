@@ -1,7 +1,8 @@
 import { Redis } from 'ioredis';
-import { CHANNEL, CHANNEL_IDX, Commit, toCommits } from '../model';
+import { Commit, toCommits } from './commits';
+import { CHANNEL, CHANNEL_IDX } from '.';
 
-export const Commits = {
+export const CommitStore = {
 	put: (client: Redis, commit: Commit): Promise<number> => {
 		return new Promise<number>(async (resolve, reject) => {
 			const commitStr = JSON.stringify(commit);
@@ -14,11 +15,11 @@ export const Commits = {
 					client.publish(CHANNEL, JSON.stringify({ id: commit.id, timestamp })); // Notify a new commit is written
 					resolve(timestamp);
 				} else
-					reject(new Error('[Commits.write] commit sorted set corrupted')); // Should not happen, as the data was just written to REDIS two lines ago (zadd)
+					reject(new Error('[CommitStore.write] commit sorted set corrupted')); // Should not happen, as the data was just written to REDIS two lines ago (zadd)
 			} else if (count === 0) {
-				reject(new Error(`[Commits.write] commit ${commitStr} already exists`));
+				reject(new Error(`[CommitStore.write] commit ${commitStr} already exists`));
 			} else
-				reject(new Error(`[Commits.write] unknown error ${count} writing commit`));
+				reject(new Error(`[CommitStore.write] unknown error ${count} writing commit`));
 		});
 	},
 	get: (client: Redis, args: {
@@ -32,16 +33,16 @@ export const Commits = {
 				if (idx) {
 					const index = parseInt(idx, 10);
 					try {
-						resolve(toCommits('[Commits.get]', await client.zrange(CHANNEL, index, index, 'WITHSCORES')));
+						resolve(toCommits('[CommitStore.get]', await client.zrange(CHANNEL, index, index, 'WITHSCORES')));
 					} catch (error) {
 						reject(error);
 					}
 				} else {
-					reject(new Error(`[Commits.get] Commit ID ${args.id} not found in index`));
+					reject(new Error(`[CommitStore.get] Commit ID ${args.id} not found in index`));
 				}
 			} else {
 				try {
-					resolve(toCommits('[Commits.get]',
+					resolve(toCommits('[CommitStore.get]',
 						await client.zrangebyscore(CHANNEL,
 							args.fromTime ? args.fromTime : '-inf',
 							args.toTime ? args.toTime : '+inf',
