@@ -1,9 +1,11 @@
 require('dotenv').config();
+jest.mock('../entities/card');
 import RedisClient, { Redis } from 'ioredis';
-import { buildContinents, buildDeck, buildMap, Continents, Territories, WildCards } from '../entities';
-import { Commands, Commit } from '../commits';
-import { CHANNEL, CHANNEL_IDX, CommitStore } from '..';
+import { buildContinents, buildDeck, buildMap, Continents, Errors, Game, Player, shuffleDeck, Territories, WildCards } from '../entities';
+import { Commands, Commit, CommitStore, isNotification, toCommits } from '../commits';
+import { isEmpty, reducer } from '..';
 
+const CHANNEL = `wdom${Date.now()}`;
 const host = process.env.REDIS_HOST;
 const port = (process.env.REDIS_PORT || 6379) as number;
 const timestamp = Date.now();
@@ -12,12 +14,14 @@ const commits: Commit[] = [];
 
 let players: Record<string, Commit>;
 let games: Record<string, Commit>;
-let publisher: Redis;
+let publisher1: Redis;
+let publisher2: Redis;
 let subscriber: Redis;
 let cutoff: number;
 
 beforeAll(async () => {
-	publisher = new RedisClient({ host, port });
+	publisher1 = new RedisClient({ host, port });
+	publisher2 = new RedisClient({ host, port });
 
 	subscriber = new RedisClient({ host, port });
 	subscriber.on('message', (channel, message) => {
@@ -66,7 +70,7 @@ beforeAll(async () => {
 	let count = 0;
 	for (const commit of commits) {
 		count ++;
-		await CommitStore.put(publisher, commit);
+		await CommitStore.put(publisher1, CHANNEL, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
 		if (count === 14) {
 			cutoff = Date.now();
@@ -77,14 +81,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	subscriber.quit();
-	publisher.quit();
+	publisher2.quit();
+	publisher1.quit();
 	return new Promise((resolve) => setTimeout(() => {
 		console.log(`Unit test of channel ${CHANNEL} finished`);
 		resolve();
 	}, 1000));
 });
 
-describe('Misc tests', () => {
+describe('Programming behaviour tests', () => {
 	it('test enum with for-in-loop', () => {
 		const result = [];
 		for (const item in Continents) {
@@ -149,25 +154,86 @@ describe('Misc tests', () => {
 		}
 		expect(count).toEqual(44);
 	});
+
+	it('test Object.values()', () => {
+		const deck = buildDeck();
+		const list = Object.values(deck);
+		console.log(list[21]);
+		expect(list.length).toEqual(44);
+	});
+
+	it('test Player draw Cards', () => {
+		const player: Player = {
+			token: '12345',
+			name: 'Player One',
+			reinforcement: 0,
+			cards: {},
+			ready: true
+		};
+		const deck = shuffleDeck();
+		for (let i = 0; i < 5; i ++) {
+			const card = deck.pop();
+			if (card) player.cards[card.name] = card;
+		}
+		console.log(player.cards[Territories.MiddleEast]);
+		expect(player.cards[Territories.MiddleEast].type).toEqual(1);
+	});
+
+	it('test isEmpty', () => {
+		const v1 = {};
+		const v2 = null;
+		const v3 = undefined;
+		const v4 = {1:2};
+		const v5 = '';
+		expect(isEmpty(v1)).toBeTruthy();
+		expect(isEmpty(v2)).toBeTruthy();
+		expect(isEmpty(v3)).toBeTruthy();
+		expect(isEmpty(v4)).toBeFalsy();
+		expect(isEmpty(v5)).toBeTruthy();
+	});
+});
+
+describe('Redis client tests', () => {
+	it('test non-existing hash', async () => {
+		const result = await publisher1.hgetall('NONEXISTING');
+		expect(isEmpty(result)).toBeTruthy();
+	});
+
+	it('test writing object to hash', async () => {
+		const result1 = await publisher1.hset(`${CHANNEL}TEST1`, '12345', 'Hello how are you');
+		const result2 = await publisher1.hset(`${CHANNEL}TEST1`, '12345', 'Hello how are you');
+		const result3 = await publisher1.hset(`${CHANNEL}TEST1`, '12345', 'Hello how are me');
+		await new Promise((resolve) => setTimeout(() => resolve(), 100));
+		const result4 = await publisher1.hget(`${CHANNEL}TEST1`, '12345');
+		expect(result1).toBeTruthy();
+		expect(result2).toBeFalsy();
+		expect(result3).toBeFalsy();
+		expect(result4).toEqual('Hello how are me');
+	});
+
+	it('test non-existing field in hash', async () => {
+		const result = await publisher1.hget(`${CHANNEL}TEST1`, '12346');
+		console.log('HM', result);
+	});
+
+	it('connect to redis', async () => {
+		await publisher1.incr(`counter${timestamp}`);
+		await publisher1.incr(`counter${timestamp}`);
+		await publisher1.incr(`counter${timestamp}`);
+		await publisher1.decr(`counter${timestamp}`);
+		const result = await publisher1.get(`counter${timestamp}`);
+		expect(result).toEqual('2');
+	});
 });
 
 describe('Unit tests with redis', () => {
-	it('connect to redis', async () => {
-		await publisher.incr(`counter${timestamp}`);
-		await publisher.incr(`counter${timestamp}`);
-		await publisher.incr(`counter${timestamp}`);
-		await publisher.decr(`counter${timestamp}`);
-		const result = await publisher.get(`counter${timestamp}`);
-		expect(result).toEqual('2');
-	});
-
 	it('read commits after a time', async () => {
-		const received = await CommitStore.get(publisher, { fromTime: cutoff });
+		const received = await CommitStore.get(publisher1, CHANNEL, { fromTime: cutoff });
 		expect(received.length).toEqual(11);
 	});
 
 	it('read commits before a timestamp', async () => {
-		const received = await CommitStore.get(publisher, { toTime: cutoff });
+		const received = await CommitStore.get(publisher1, CHANNEL, { toTime: cutoff });
 		expect(received.length).toEqual(14);
 	});
 
@@ -184,7 +250,7 @@ describe('Unit tests with redis', () => {
 
 		await subscriber.subscribe(CHANNEL);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
-		const timestamp = await CommitStore.put(publisher, commit);
+		const timestamp = await CommitStore.put(publisher1, CHANNEL, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 300));
 		expect(chnl).toEqual(CHANNEL);
 		expect(JSON.parse(mssg)).toEqual({ id: commit.id, timestamp });
@@ -193,9 +259,9 @@ describe('Unit tests with redis', () => {
 	it('read commit by id (using index)', async () => {
 		const commit = Commands.RegisterPlayer({ playerName: 'patt' });
 
-		await CommitStore.put(publisher, commit);
+		await CommitStore.put(publisher1, CHANNEL, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
-		const received = await CommitStore.get(publisher, { id: commit.id });
+		const received = await CommitStore.get(publisher1, CHANNEL, { id: commit.id });
 		expect({
 			id: received[0].id,
 			version: received[0].version,
@@ -206,34 +272,117 @@ describe('Unit tests with redis', () => {
 	it('fail to put duplicated commit', async () => {
 		const commit = Commands.RegisterPlayer({ playerName: 'patt' });
 
-		await CommitStore.put(publisher, commit);
+		await CommitStore.put(publisher1, CHANNEL, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
 
-		await expect(CommitStore.put(publisher, commit)).rejects.toThrow(/\[CommitStore[.]write\] commit \{.*\} already exists/); // already exists
+		await expect(CommitStore.put(publisher1, CHANNEL, commit)).rejects.toThrow(/\[CommitStore[.]write\] commit \{.*\} already exists/);
 	});
 
 	it('fail to get commit by non-existing id', async () => {
 		const id = 'abcd1234';
-		await expect(CommitStore.get(publisher, { id })).rejects.toThrow(`[CommitStore.get] Commit ID ${id} not found in index`);
+		await expect(CommitStore.get(publisher1, CHANNEL, { id })).rejects.toThrow(`[CommitStore.get] Commit ID ${id} not found in index`);
 	});
 
 	it ('read objects of unknown type from redis', async () => {
 		const fakeJson = '{"commitId":"12345","version":0,"events":["hello"]}';
-		await publisher.zadd(CHANNEL, timestamp, fakeJson);
-		const idx1 = await publisher.zrank(CHANNEL, fakeJson);
+		await publisher1.zadd(CHANNEL, timestamp, fakeJson);
+		const idx1 = await publisher1.zrank(CHANNEL, fakeJson);
 		if (idx1 !== null) {
-			await publisher.hset(CHANNEL_IDX, '12345', idx1);
+			await publisher1.hset(`${CHANNEL}CommitIdx`, '12345', idx1);
 		}
-		await expect(CommitStore.get(publisher, { id: '12345' })).rejects.toThrow(`[CommitStore.get] Unknown object type ${fakeJson}`);
+		await expect(CommitStore.get(publisher1, CHANNEL, { id: '12345' })).rejects.toThrow(`[CommitStore.get] Unknown object type ${fakeJson}`);
 	});
 
-	it ('read non-JSON data from redis', async () => {
+	it('read non-JSON data from redis', async () => {
 		const fakeStrg = 'This is not JSON';
-		await publisher.zadd(CHANNEL, timestamp, fakeStrg);
-		const idx2 = await publisher.zrank(CHANNEL, fakeStrg);
+		await publisher1.zadd(CHANNEL, timestamp, fakeStrg);
+		const idx2 = await publisher1.zrank(CHANNEL, fakeStrg);
 		if (idx2 !== null) {
-			await publisher.hset(CHANNEL_IDX, '12346', idx2);
+			await publisher1.hset(`${CHANNEL}CommitIdx`, '12346', idx2);
 		}
-		await expect(CommitStore.get(publisher, { id: '12346' })).rejects.toThrow(`Unexpected token T in JSON at position 0`);
+		await expect(CommitStore.get(publisher1, CHANNEL, { id: '12346' })).rejects.toThrow(`Unexpected token T in JSON at position 0`);
 	});
+
+	it('read commit by id (using index)', async () => {
+		const commit = Commands.RegisterPlayer({ playerName: 'patt' });
+
+		await CommitStore.put(publisher1, CHANNEL, commit);
+		await new Promise((resolve) => setTimeout(() => resolve(), 100));
+		const received = await CommitStore.get(publisher1, CHANNEL, { id: commit.id });
+		expect({
+			id: received[0].id,
+			version: received[0].version,
+			events: received[0].events
+		}).toEqual(commit);
+	});
+
+	it('write commits to redis, receive notifications, calculate snapshots', async () => {
+		// expect.assertions(2);
+
+		let lastPos: number = -1;
+		let splayers: Record<string, Player> = {};
+		let sgames: Record<string, Game> = {};
+		let serrors: Record<string, Errors> = {};
+		mockInSubscriber.mockImplementation((channel, message) => {
+			const noti = JSON.parse(message);
+			if (isNotification(noti)) {
+				publisher2.zrangebyscore(
+					channel, (lastPos >= 0) ? lastPos : '-inf', noti.timestamp, 'WITHSCORES', (error, result) => {
+						if (error) {
+							console.log(`[EntitiesDS.subscriber.on - message]: ${error}`);
+						} else {
+							const incomings = toCommits('[EntitiesDS.subscriber.on - message]', result);
+							const { players, games, errors } = reducer(incomings, { players: splayers, games: sgames, errors: serrors });
+							splayers = players;
+							sgames = games;
+							serrors = errors;
+						}
+					}
+				);
+				lastPos = noti.timestamp + 1;
+			}
+		});
+
+		await subscriber.subscribe(`${CHANNEL}2`);
+		await new Promise((resolve) => setTimeout(() => resolve(), 100));
+
+		const commit0 = Commands.RegisterPlayer({ playerName: 'john' });
+		const commit1 = Commands.RegisterPlayer({ playerName: 'pete' });
+		const commit2 = Commands.RegisterPlayer({ playerName: 'josh' });
+		const commit4 = Commands.RegisterPlayer({ playerName: 'jess' });
+		const commit3 = Commands.OpenGame({ playerToken: commit2.id, gameName: 'Josh\'s game' });
+		const commit5 = Commands.OpenGame({ playerToken: commit4.id, gameName: 'Josh\'s game' });
+		const commit6 = Commands.OpenGame({ playerToken: commit0.id, gameName: 'John\'s game' });
+		await CommitStore.put(publisher1, `${CHANNEL}2`, commit0);
+		await CommitStore.put(publisher1, `${CHANNEL}2`, Commands.RegisterPlayer({ playerName: 'john' }));
+		await CommitStore.put(publisher1, `${CHANNEL}2`, commit1);
+		await CommitStore.put(publisher1, `${CHANNEL}2`, commit2);
+		await CommitStore.put(publisher1, `${CHANNEL}2`, Commands.PlayerLeave({ playerToken: commit1.id }));
+		await CommitStore.put(publisher1, `${CHANNEL}2`, commit4);
+		await CommitStore.put(publisher1, `${CHANNEL}2`, commit3);
+		await CommitStore.put(publisher1, `${CHANNEL}2`, commit5);
+		await CommitStore.put(publisher1, `${CHANNEL}2`, commit6);
+		await new Promise((resolve) => setTimeout(() => resolve(), 300));
+
+		console.log('HA0', lastPos);
+		console.log('HA1', splayers);
+		// console.log('HA2', sgames);
+		console.log('HA3', serrors);
+
+		expect(Object.values(splayers).map(p => p.name)).toEqual(['john', 'josh', 'jess']);
+
+		expect(Object.values(sgames).map(g => g.name)).toEqual(['Josh\'s game', 'John\'s game']);
+
+		expect(Object.values(serrors).map(e => e.message)).toEqual([
+			'Player john already registered', 'Game Josh\'s game already exists'
+		]);
+
+		let tcard = null;
+		for (let i = 0; i < 5; i ++) {
+			const card = sgames[commit3.id].cards.pop();
+			if (i === 4) tcard = card;
+		}
+		expect(tcard?.name).toEqual('Middle-East');
+	});
+
 });

@@ -1,8 +1,10 @@
 import { DataSource } from 'apollo-datasource';
 import { Redis } from 'ioredis';
-import { reducer } from './entities';
+import { Errors, Game, Player } from './entities';
 import { isNotification, toCommits } from './commits';
-import { CHANNEL } from '.';
+import { reducer } from '.';
+
+const CHANNEL = `wdom${Date.now()}`;
 
 export class EntityDS extends DataSource {
 	constructor(private client: Redis) {
@@ -13,6 +15,11 @@ export class EntityDS extends DataSource {
 	private subscriber: Redis = this.client.duplicate();
 	private ready: boolean = false;
 	private lastPos: number = -1;
+
+	// Snapshots
+	private players: Record<string, Player> = {};
+	private games: Record<string, Game> = {};
+	private errors: Record<string, Errors> = {};
 
 	isReady() {
 		return this.ready;
@@ -31,11 +38,14 @@ export class EntityDS extends DataSource {
 								console.log(`[EntitiesDS.subscriber.on - message]: ${error}`);
 							} else {
 								const incomings = toCommits('[EntitiesDS.subscriber.on - message]', result);
-								reducer(this.client, channel, incomings);
+								const { players, games, errors } = reducer(incomings, { players: this.players, games: this.games, errors: this.errors });
+								this.players = players;
+								this.games = games;
+								this.errors = errors;
 							}
 						}
 					);
-					this.lastPos = noti.timestamp;
+					this.lastPos = noti.timestamp + 1;
 				}
 			} catch (error) {
 				console.log(`[EntitiesDS.initialize] parse error: ${error}`);

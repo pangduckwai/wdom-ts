@@ -2,6 +2,7 @@ import crypto from 'crypto';
 
 export * from './events';
 export * from './commands';
+export * from './store';
 
 export const generateToken = (timestamp: number) =>
 	crypto.createHash('sha256').update('' + (timestamp + Math.floor(Math.random()*10000))).digest('base64');
