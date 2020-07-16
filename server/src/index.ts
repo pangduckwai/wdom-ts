@@ -1,7 +1,6 @@
-import { Card, Continent, Continents, Territory } from './entities';
+import { Card, Continent, Continents, Territory } from './queries';
 
 export * from './data-src';
-export * from './reducer';
 
 export const isEmpty = (obj: any) =>
 	obj ? !Object.values(obj).some(value => (value !== null) && (typeof value !== 'undefined')) : true;

@@ -1,9 +1,9 @@
 require('dotenv').config();
-jest.mock('../entities/card');
+jest.mock('../queries/card');
 import RedisClient, { Redis } from 'ioredis';
-import { buildContinents, buildDeck, buildMap, Continents, Errors, Game, Player, shuffleDeck, Territories, WildCards } from '../entities';
-import { Commands, Commit, CommitStore, isNotification, toCommits } from '../commits';
-import { isEmpty, reducer } from '..';
+import { Commands, Commit, CommitStore, isNotification, toCommits } from '../commands';
+import { buildContinents, buildDeck, buildMap, Continents, Errors, Game, Player, reducer, shuffleDeck, Territories, WildCards } from '../queries';
+import { isEmpty } from '..';
 
 const CHANNEL = `wdom${Date.now()}`;
 const host = process.env.REDIS_HOST;

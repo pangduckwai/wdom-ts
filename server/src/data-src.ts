@@ -1,8 +1,7 @@
 import { DataSource } from 'apollo-datasource';
 import { Redis } from 'ioredis';
-import { Errors, Game, Player } from './entities';
-import { isNotification, toCommits } from './commits';
-import { reducer } from '.';
+import { Errors, Game, Player, reducer } from './queries';
+import { isNotification, toCommits } from './commands';
 
 const CHANNEL = `wdom${Date.now()}`;
 

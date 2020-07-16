@@ -1,6 +1,6 @@
-import { Commit, generateToken } from './commits';
-import { buildMap, Errors, Game, Player, shuffleDeck } from './entities';
-import { rules } from '.';
+import { Commit, generateToken } from '../commands';
+import { buildMap, Errors, Game, Player, shuffleDeck } from '.';
+import { rules } from '..';
 
 export const reducer = (
 	commits: Commit[],

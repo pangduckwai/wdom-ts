@@ -1,9 +1,10 @@
-import { BaseEvent } from '../commits';
+import { BaseEvent } from '../commands';
 import { Card } from './card';
 import { Territory } from './territory';
 
 export * from './card';
 export * from './territory';
+export * from './reducer';
 
 export interface Player {
 	token: string;
