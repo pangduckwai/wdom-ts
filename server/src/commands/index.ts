@@ -1,13 +1,20 @@
 import crypto from 'crypto';
+import { Redis } from 'ioredis';
 
 export * from './events';
 export * from './commands';
 export * from './store';
-export * from './service';
+export * from './schema';
 
 export const generateToken = (timestamp: number) =>
 	crypto.createHash('sha256').update('' + (timestamp + Math.floor(Math.random()*10000))).digest('base64');
 
+export type CommandContext = {
+	client: Redis;
+	channel: string;
+	sessionid?: string;
+};
+	
 // ============================
 // === Event Sourcing types ===
 export interface BaseEvent {

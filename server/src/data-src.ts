@@ -2,8 +2,7 @@ import { DataSource } from 'apollo-datasource';
 import { Redis } from 'ioredis';
 import { Errors, Game, Player, reducer } from './queries';
 import { isNotification, toCommits } from './commands';
-
-const CHANNEL = `wdom${Date.now()}`;
+import { CHANNEL } from '.';
 
 export class EntityDS extends DataSource {
 	constructor(private client: Redis) {
