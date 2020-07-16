@@ -250,10 +250,10 @@ describe('Unit tests with redis', () => {
 
 		await subscriber.subscribe(CHANNEL);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
-		const timestamp = await CommitStore.put(publisher1, CHANNEL, commit);
+		const c = await CommitStore.put(publisher1, CHANNEL, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 300));
 		expect(chnl).toEqual(CHANNEL);
-		expect(JSON.parse(mssg)).toEqual({ id: commit.id, timestamp });
+		expect(JSON.parse(mssg)).toEqual({ id: commit.id, timestamp: c.timestamp });
 	});
 
 	it('read commit by id (using index)', async () => {
@@ -262,11 +262,7 @@ describe('Unit tests with redis', () => {
 		await CommitStore.put(publisher1, CHANNEL, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
 		const received = await CommitStore.get(publisher1, CHANNEL, { id: commit.id });
-		expect({
-			id: received[0].id,
-			version: received[0].version,
-			events: received[0].events
-		}).toEqual(commit);
+		expect(received[0]).toEqual(commit);
 	});
 
 	it('fail to put duplicated commit', async () => {
@@ -274,8 +270,9 @@ describe('Unit tests with redis', () => {
 
 		await CommitStore.put(publisher1, CHANNEL, commit);
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
+		delete commit.timestamp;
 
-		await expect(CommitStore.put(publisher1, CHANNEL, commit)).rejects.toThrow(/\[CommitStore[.]write\] commit \{.*\} already exists/);
+		await expect(CommitStore.put(publisher1, CHANNEL, commit)).rejects.toThrow(/\[CommitStore lua\] commit \{.*\} already exists/);
 	});
 
 	it('fail to get commit by non-existing id', async () => {
@@ -301,19 +298,6 @@ describe('Unit tests with redis', () => {
 			await publisher1.hset(`${CHANNEL}CommitIdx`, '12346', idx2);
 		}
 		await expect(CommitStore.get(publisher1, CHANNEL, { id: '12346' })).rejects.toThrow(`Unexpected token T in JSON at position 0`);
-	});
-
-	it('read commit by id (using index)', async () => {
-		const commit = Commands.RegisterPlayer({ playerName: 'patt' });
-
-		await CommitStore.put(publisher1, CHANNEL, commit);
-		await new Promise((resolve) => setTimeout(() => resolve(), 100));
-		const received = await CommitStore.get(publisher1, CHANNEL, { id: commit.id });
-		expect({
-			id: received[0].id,
-			version: received[0].version,
-			events: received[0].events
-		}).toEqual(commit);
 	});
 
 	it('write commits to redis, receive notifications, calculate snapshots', async () => {

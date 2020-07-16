@@ -1,24 +1,40 @@
 import { Redis } from 'ioredis';
 import { Commit, toCommits } from '.';
 
+const lua =
+	'local count = redis.call("zadd", KEYS[1], ARGV[1], ARGV[2])\n' +
+	'if count == 1 then\n' +
+	'  local idx = redis.call("zrank", KEYS[1], ARGV[2])\n' +
+	'  if idx then\n' +
+	'    redis.call("hset", KEYS[2], ARGV[3], idx)\n' +
+	'    redis.call("publish", KEYS[1], \'{ \"id\": \"\' .. ARGV[3] .. \'\", \"timestamp\": \' .. ARGV[1] .. \' }\')\n' +
+	'    return "OK"\n' +
+	'  else\n' +
+	'    return redis.error_reply("[CommitStore lua] commit sorted set corrupted")\n' +
+	'  end\n' +
+	'else\n' +
+	'  if count == 0 then\n' +
+	'    return redis.error_reply("[CommitStore lua] commit " .. ARGV[2] .. " already exists")\n' +
+	'  else\n' +
+	'    return redis.error_reply("[CommitStore lua] unknown error when writing commit (".. count .. ")")\n' +
+	'  end\n' +
+	'end'
+
 export const CommitStore = {
-	put: (client: Redis, channel: string, commit: Commit): Promise<number> => {
-		return new Promise<number>(async (resolve, reject) => {
-			const commitStr = JSON.stringify(commit);
+	put: (client: Redis, channel: string, commit: Commit): Promise<Commit> => {
+		return new Promise<Commit>(async (resolve, reject) => {
 			const timestamp = Date.now();
-			const count = await client.zadd(channel, timestamp, commitStr); // commit ID is random, will not duplicate
-			if (count === 1) {
-				const idx = await client.zrank(channel, commitStr);
-				if (idx !== null) {
-					await client.hset(`${channel}CommitIdx`, commit.id, idx);
-					client.publish(channel, JSON.stringify({ id: commit.id, timestamp })); // Notify a new commit is written
-					resolve(timestamp);
-				} else
-					reject(new Error('[CommitStore.write] commit sorted set corrupted')); // Should not happen, as the data was just written to REDIS two lines ago (zadd)
-			} else if (count === 0) {
-				reject(new Error(`[CommitStore.write] commit ${commitStr} already exists`));
-			} else
-				reject(new Error(`[CommitStore.write] unknown error ${count} writing commit`));
+			try {
+				const result = await client.eval(lua, 2, [channel, `${channel}CommitIdx`, timestamp, JSON.stringify(commit), commit.id]);
+				if (result === 'OK') {
+					commit.timestamp = timestamp;
+					resolve(commit);
+				} else {
+					reject(new Error(result));
+				}
+			} catch (error) {
+				reject(error);
+			}
 		});
 	},
 	get: (client: Redis, channel: string, args: {
