@@ -5,6 +5,7 @@ export * from './events';
 export * from './commands';
 export * from './store';
 export * from './schema';
+export * from './service';
 
 export const generateToken = (timestamp: number) =>
 	crypto.createHash('sha256').update('' + (timestamp + Math.floor(Math.random()*10000))).digest('base64');
@@ -14,7 +15,7 @@ export type CommandContext = {
 	channel: string;
 	sessionid?: string;
 };
-	
+
 // ============================
 // === Event Sourcing types ===
 export interface BaseEvent {

@@ -71,6 +71,9 @@ union Response = Commit | Error
 `;
 
 export const resolvers = {
+	Response: {
+		__resolveType: (obj: any) => (obj.id) ? 'Commit' : (obj.message) ? 'Error' : {}
+	},
 	Query: {
 		getCommitById: async (
 			_: any, { id }: any, { client, channel }: CommandContext

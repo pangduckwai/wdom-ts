@@ -3,9 +3,8 @@ jest.mock('../queries/card');
 import RedisClient, { Redis } from 'ioredis';
 import { Commands, Commit, CommitStore, isNotification, toCommits } from '../commands';
 import { buildContinents, buildDeck, buildMap, Continents, Errors, Game, Player, reducer, shuffleDeck, Territories, WildCards } from '../queries';
-import { isEmpty } from '..';
+import { CHANNEL, isEmpty } from '..';
 
-const CHANNEL = `wdom${Date.now()}`;
 const host = process.env.REDIS_HOST;
 const port = (process.env.REDIS_PORT || 6379) as number;
 const timestamp = Date.now();
