@@ -1,11 +1,13 @@
 require('dotenv').config();
+jest.mock('../rules/card');
 import fetch from 'node-fetch';
 import { commandService } from '../commands';
-import { CHANNEL } from '..';
+import { shuffleDeck } from '../rules';
 import {
-	REGISTER_PLAYER, PLAYER_LEAVE, OPEN_GAME, JOIN_GAME, CLOSE_GAME, QUIT_GAME, START_GAME
+	REGISTER_PLAYER, PLAYER_LEAVE, OPEN_GAME, JOIN_GAME, CLOSE_GAME, QUIT_GAME, START_GAME, ASSIGN_TERRITORY
 } from './utils';
 
+const CHANNEL = `ctest${Date.now()}`;
 const redisHost = process.env.REDIS_HOST || 'localhost';
 const redisPort = (process.env.REDIS_PORT || 6379) as number;
 const servicePort = 4031; // (process.env.COMMANDS_PORT || 4000) as number;
@@ -13,21 +15,21 @@ const SERVICE = `http://localhost:${servicePort}/graphql`;
 let stopService: () => Promise<number>;
 
 const players: any = {
-	pete: '', // game
-	josh: '', // game
-	saul: '', // game
-	jess: '',
-	bill: '', // leave
-	matt: '',
-	nick: '',
-	dick: '', // not in game
-	dave: '', // leave
-	john: '',
-	mike: '',
+	pete: { id: '', holding: [] }, // game
+	josh: { id: '', holding: [] }, // game
+	saul: { id: '', holding: [] }, // game
+	jess: { id: '', holding: [] },
+	bill: { id: '', holding: [] }, // leave
+	matt: { id: '', holding: [] },
+	nick: { id: '', holding: [] },
+	dick: { id: '', holding: [] }, // not in game
+	dave: { id: '', holding: [] }, // leave
+	john: { id: '', holding: [] },
+	mike: { id: '', holding: [] },
 };
 const games: any = {
 	pete: { id: '', members: ['jess'] },
-	josh: { id: '', members: ['matt'] }, // 'nick', 'mike', 'john', 'saul'
+	josh: { id: '', members: ['josh', 'matt'] }, // 'nick', 'mike', 'john', 'saul'
 	saul: { id: '', members: ['nick', 'mike', 'john'] },
 }
 
@@ -44,7 +46,7 @@ afterAll(async () => {
 	await stopService();
 	return new Promise((resolve) => setTimeout(() => {
 		console.log(`Unit test of channel ${CHANNEL} finished`);
-		console.log(`players: ${JSON.stringify(players, null, ' ')};\ngames:${Object.keys(games).map(k => `\n "${k}": "${games[k].id}"`)}`)
+		console.log(`players: ${Object.keys(players).map(p => `\n "${p}": "${players[p].holding}"`)};\ngames:${Object.keys(games).map(k => `\n "${k}": "${games[k].members}"`)}`)
 		resolve();
 	}, 100));
 });
@@ -61,7 +63,7 @@ describe('Commands Service tests - Players', () => {
 			})})
 			.then(res => res.json())
 			.then(({ data }) => {
-				players[playerName] = data.registerPlayer.id;
+				players[playerName].id = data.registerPlayer.id;
 				expect(data.registerPlayer.id).toBeDefined();
 			}).catch(_ => expect(false).toBeTruthy());
 		}
@@ -69,7 +71,7 @@ describe('Commands Service tests - Players', () => {
 
 	it('players leave game room', async () => {
 		for (const name of ['bill', 'dave']) {
-			const playerToken = players[name];
+			const playerToken = players[name].id;
 			await fetch(SERVICE, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
@@ -120,7 +122,7 @@ describe('Commands Service tests - Players', () => {
 describe('Commands Service tests - Prepare Games', () => {
 	it('players open games', async () => {
 		for (const playerName of Object.keys(games)) {
-			const playerToken = players[playerName];
+			const playerToken = players[playerName].id;
 			await fetch(SERVICE, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
@@ -139,7 +141,7 @@ describe('Commands Service tests - Prepare Games', () => {
 	it('players join games', async () => {
 		for (const gameName of Object.keys(games)) {
 			for (const playerName of games[gameName].members) {
-				const playerToken = players[playerName];
+				const playerToken = players[playerName].id;
 				const gameToken = games[gameName].id;
 				await fetch(SERVICE, {
 					method: 'POST',
@@ -162,7 +164,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'JoinGame', query: JOIN_GAME,
-				variables: { playerToken: players['pete'], gameToken: games['pete'].id }
+				variables: { playerToken: players['pete'].id, gameToken: games['pete'].id }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -176,7 +178,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'CloseGame', query: CLOSE_GAME,
-				variables: { playerToken: players['saul'] }
+				variables: { playerToken: players['saul'].id, gameToken: games['saul'].id }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -190,7 +192,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'CloseGame', query: CLOSE_GAME,
-				variables: { playerToken: players['matt'] }
+				variables: { playerToken: players['matt'].id, gameToken: games['josh'].id }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -201,7 +203,7 @@ describe('Commands Service tests - Prepare Games', () => {
 	it('players join another game', async () => {
 		const names = [...games['saul'].members, 'saul'];
 		for (const playerName of names) {
-			const playerToken = players[playerName];
+			const playerToken = players[playerName].id;
 			const gameToken = games['josh'].id;
 			await fetch(SERVICE, {
 				method: 'POST',
@@ -212,6 +214,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			})})
 			.then(res => res.json())
 			.then(({ data }) => {
+				games['josh'].members.push(playerName);
 				expect(data.joinGame.id).toBeDefined();
 			}).catch(_ => expect(false).toBeTruthy());
 		}
@@ -223,7 +226,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'QuitGame', query: QUIT_GAME,
-				variables: { playerToken: players['jess'] }
+				variables: { playerToken: players['jess'].id, gameToken: games['pete'].id }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -237,7 +240,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'QuitGame', query: QUIT_GAME,
-				variables: { playerToken: players['pete'] }
+				variables: { playerToken: players['pete'].id, gameToken: games['pete'].id }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -251,7 +254,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'QuitGame', query: QUIT_GAME,
-				variables: { playerToken: players['dick'] }
+				variables: { playerToken: players['dick'].id, gameToken: games['josh'].id }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -265,7 +268,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'StartGame', query: START_GAME,
-				variables: { playerToken: players['matt'] }
+				variables: { playerToken: players['matt'].id, gameToken: games['josh'].id }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -279,7 +282,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'JoinGame', query: JOIN_GAME,
-				variables: { playerToken: players['jess'], gameToken: games['josh'].id }
+				variables: { playerToken: players['jess'].id, gameToken: games['josh'].id }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -293,12 +296,32 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'StartGame', query: START_GAME,
-				variables: { playerToken: players['josh'] }
+				variables: { playerToken: players['josh'].id, gameToken: games['josh'].id }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
 			expect(data.startGame.id).toBeDefined();
 		}).catch(_ => expect(false).toBeTruthy());
 	});
+});
 
+describe('Commands Service tests - Prepare Games', () => {
+	it('assign territories', async () => {
+		let p = 0
+		for (const card of shuffleDeck()) {
+			await fetch(SERVICE, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					operationName: 'AssignTerritory', query: ASSIGN_TERRITORY,
+					variables: { playerToken: players[games['josh'].members[p]].id, gameToken: games['josh'].id, territoryName: card.name }
+			})})
+			.then(res => res.json())
+			.then(({ data }) => {
+				players[games['josh'].members[p]].holding.push(card.name);
+				p = (p+1) % games['josh'].members.length;
+				expect(data.assignTerritory.id).toBeDefined();
+			}).catch(_ => expect(false).toBeTruthy());
+		}
+	});
 });

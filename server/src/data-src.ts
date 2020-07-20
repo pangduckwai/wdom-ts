@@ -1,6 +1,6 @@
 import { DataSource } from 'apollo-datasource';
 import { Redis } from 'ioredis';
-import { Errors, Game, Player, reducer } from './queries';
+import { Game, Player, reducer } from './queries';
 import { isNotification, toCommits } from './commands';
 import { CHANNEL } from '.';
 
@@ -17,7 +17,7 @@ export class EntityDS extends DataSource {
 	// Snapshots
 	private players: Record<string, Player> = {};
 	private games: Record<string, Game> = {};
-	private errors: Record<string, Errors> = {};
+	private errors: Record<string, string> = {};
 
 	isReady() {
 		return this.ready;

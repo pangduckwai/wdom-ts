@@ -6,7 +6,9 @@
 	"scripts": {
 		"build": "rimraf dist && tsc",
 		"clean": "rimraf dist",
-		"test": "jest commands-test",
+		"unit-test": "jest unit-test",
+		"commands-test": "jest commands-test",
+		"test": "jest",
 		"sim": "jest simulation",
 		"start": "nodemon dist/server.js",
 		"commands": "nodemon dist/service-commands.js"

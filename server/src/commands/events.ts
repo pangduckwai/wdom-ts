@@ -1,4 +1,8 @@
-import { BaseEvent } from '.';
+
+export interface BaseEvent {
+	readonly type: string;
+	payload: any;
+}
 
 // ************************
 // *** Game room Events ***
@@ -28,6 +32,7 @@ export interface GameClosed extends BaseEvent {
 	readonly type: 'GameClosed';
 	payload: {
 		playerToken: string;
+		gameToken: string;
 	}
 }
 
@@ -43,6 +48,7 @@ export interface GameQuitted extends BaseEvent {
 	readonly type: 'GameQuitted';
 	payload: {
 		playerToken: string;
+		gameToken: string;
 	}
 }
 
@@ -50,6 +56,7 @@ export interface GameStarted extends BaseEvent {
 	readonly type: 'GameStarted';
 	payload: {
 		playerToken: string;
+		gameToken: string;
 	}
 }
 // ************************
@@ -119,35 +126,36 @@ export interface PlayerDefeated extends BaseEvent {
 	}
 }
 
-/** Placing troops during game setup */
+/** Placing troops on map (both during game setup and add reinforcement */
 export interface TroopPlaced extends BaseEvent {
 	readonly type: 'TroopPlaced';
 	payload: {
 		playerToken: string;
 		gameToken: string;
 		territoryName: string;
+		amount?: number;
 	}
 }
 
-/** Placing reinforcement during reinforcement stage */
-export interface TroopAdded extends BaseEvent {
-	readonly type: 'TroopAdded';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-		territoryName: string;
-	}
-}
+// /** Placing reinforcement during reinforcement stage */
+// export interface TroopAdded extends BaseEvent {
+// 	readonly type: 'TroopAdded';
+// 	payload: {
+// 		playerToken: string;
+// 		gameToken: string;
+// 		territoryName: string;
+// 	}
+// }
 
-/** TODO: Should marking number of troops of a player an event of its own, or should be deduced? */
-export interface TroopDeployed extends BaseEvent {
-	readonly type: 'TroopDeployed';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-		amount: number;
-	}
-}
+// /** TODO: Should marking number of troops of a player an event of its own, or should be deduced? */
+// export interface TroopDeployed extends BaseEvent {
+// 	readonly type: 'TroopDeployed';
+// 	payload: {
+// 		playerToken: string;
+// 		gameToken: string;
+// 		amount: number;
+// 	}
+// }
 
 export interface NextPlayer extends BaseEvent {
 	readonly type: 'NextPlayer';
@@ -174,10 +182,10 @@ export interface TurnEnded extends BaseEvent {
 	}
 }
 
+/** Card put back to the deck */
 export interface CardReturned extends BaseEvent {
 	readonly type: 'CardReturned';
 	payload: {
-		playerToken: string;
 		gameToken: string;
 		cardName: string;
 	}

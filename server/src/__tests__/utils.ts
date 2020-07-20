@@ -56,8 +56,8 @@ mutation JoinGame($playerToken: String!, $gameToken: String!) {
 }`;
 
 export const CLOSE_GAME = `
-mutation CloseGame($playerToken: String!) {
-  closeGame(playerToken: $playerToken) {
+mutation CloseGame($playerToken: String!, $gameToken: String!) {
+  closeGame(playerToken: $playerToken, gameToken: $gameToken) {
     ... on Commit {
 			id
 			version
@@ -70,8 +70,8 @@ mutation CloseGame($playerToken: String!) {
 }`;
 
 export const QUIT_GAME = `
-mutation QuitGame($playerToken: String!) {
-  quitGame(playerToken: $playerToken) {
+mutation QuitGame($playerToken: String!, $gameToken: String!) {
+  quitGame(playerToken: $playerToken, gameToken: $gameToken) {
     ... on Commit {
 			id
 			version
@@ -84,8 +84,22 @@ mutation QuitGame($playerToken: String!) {
 }`;
 
 export const START_GAME = `
-mutation StartGame($playerToken: String!) {
-  startGame(playerToken: $playerToken) {
+mutation StartGame($playerToken: String!, $gameToken: String!) {
+  startGame(playerToken: $playerToken, gameToken: $gameToken) {
+    ... on Commit {
+			id
+			version
+			timestamp
+		}
+		... on Error {
+			message
+		}
+  }
+}`;
+
+export const ASSIGN_TERRITORY = `
+mutation AssignTerritory($playerToken: String!, $gameToken: String!, $territoryName: String!) {
+  assignTerritory(playerToken: $playerToken, gameToken: $gameToken, territoryName: $territoryName) {
     ... on Commit {
 			id
 			version
