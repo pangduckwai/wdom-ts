@@ -69,22 +69,23 @@ end
 return rst`;
 
 export const GameSnapshot = (
+	client: Redis,
 	deck: Record<Territories | WildCards, Card>,
 ) => {
 	return {
-		exists: async (client: Redis, channel: string, game: Game): Promise<boolean> =>
+		exists: async (channel: string, game: Game): Promise<boolean> =>
 			(await client.hexists(`${channel}:Game:Name`, game.name) === 1),
-		list: (client: Redis, channel: string): Promise<Record<string, Game>> => {
+		list: (channel: string): Promise<Record<string, Game>> => {
 			return new Promise<Record<string, Game>>(async (resolve) => {
 				const results = await client.hgetall(`${channel}:Game:Name`);
 				const games: Record<string, Game> = {};
 				for (const token of Object.values(results)) {
-					games[token] = await GameSnapshot(deck).get(client, channel, { token });
+					games[token] = await GameSnapshot(client, deck).get(channel, { token });
 				}
 				resolve(games);
 			});
 		},
-		delete: (client: Redis, channel: string, game: Game): Promise<number> => {
+		delete: (channel: string, game: Game): Promise<number> => {
 			return new Promise<number>(async (resolve, reject) => {
 				if (game.status !== Status.Deleted) {
 					reject(new Error(`[GameSnapshot] Operation mismatched: ${game.token}`));
@@ -101,11 +102,11 @@ export const GameSnapshot = (
 				}
 			});
 		},
-		put: (client: Redis, channel: string, {
+		put: (channel: string, {
 			token, name, host, round, redeemed, cards, status
 		}: Game): Promise<number> => {
 			if (status === Status.Deleted) {
-				return GameSnapshot(deck).delete(client, channel, {
+				return GameSnapshot(client, deck).delete(channel, {
 					token, name, host, round, redeemed, cards, status
 				});
 			} else {
@@ -130,7 +131,7 @@ export const GameSnapshot = (
 				});
 			}
 		},
-		get: (client: Redis, channel: string, { token, name }: {token?: string; name?: string }): Promise<Game> => {
+		get: (channel: string, { token, name }: {token?: string; name?: string }): Promise<Game> => {
 			return new Promise<Game>(async (resolve, reject) => {
 				if (!token && name) token = await client.hget(`${channel}:Game:Name`, name) || undefined;
 				if (!token)

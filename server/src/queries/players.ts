@@ -79,23 +79,24 @@ end
 return rst`;
 
 export const PlayerSnapshot = (
+	client: Redis,
 	map: Record<Territories, Territory>,
 	deck: Record<Territories | WildCards, Card>
 ) => {
 	return {
-		exists: async (client: Redis, channel: string, player: Player): Promise<boolean> =>
+		exists: async (channel: string, player: Player): Promise<boolean> =>
 			(await client.hexists(`${channel}:Player:Name`, player.name) === 1),
-		list: (client: Redis, channel: string): Promise<Record<string, Player>> => {
+		list: (channel: string): Promise<Record<string, Player>> => {
 			return new Promise<Record<string, Player>>(async (resolve) => {
 				const results = await client.hgetall(`${channel}:Player:Name`);
 				const players: Record<string, Player> = {};
 				for (const token of Object.values(results)) {
-					players[token] = await PlayerSnapshot(map, deck).get(client, channel, { token });
+					players[token] = await PlayerSnapshot(client, map, deck).get(channel, { token });
 				}
 				resolve(players);
 			});
 		},
-		delete: (client: Redis, channel: string, player: Player): Promise<number> => {
+		delete: (channel: string, player: Player): Promise<number> => {
 			return new Promise<number>(async (resolve, reject) => {
 				if (player.status !== Status.Deleted) {
 					reject(new Error(`[PlayerSnapshot] Operation mismatched: ${player.token}`));
@@ -112,11 +113,11 @@ export const PlayerSnapshot = (
 				}
 			});
 		},
-		put: (client: Redis, channel: string, {
+		put: (channel: string, {
 			token, name, reinforcement, status, sessionid, joined, holdings, cards
 		}: Player): Promise<number> => {
 			if (status === Status.Deleted) {
-				return PlayerSnapshot(map, deck).delete(client, channel, {
+				return PlayerSnapshot(client, map, deck).delete(channel, {
 					token, name, reinforcement, status, sessionid, joined, holdings, cards
 				});
 			} else {
@@ -150,7 +151,7 @@ export const PlayerSnapshot = (
 				});
 			}
 		},
-		get: (client: Redis, channel: string, { token, name }: {token?: string; name?: string }): Promise<Player> => {
+		get: (channel: string, { token, name }: {token?: string; name?: string }): Promise<Player> => {
 			return new Promise<Player>(async (resolve, reject) => {
 				if (!token && name) token = await client.hget(`${channel}:Player:Name`, name) || undefined;
 				if (!token)

@@ -340,7 +340,7 @@ describe('Unit tests with redis', () => {
 			const card = cards.pop();
 			if (card && player.cards) player.cards[card.name] = card;
 		}
-		const result = await PlayerSnapshot(map, deck).put(publisher1, `${CHANNEL}3`, player)
+		const result = await PlayerSnapshot(publisher1, map, deck).put(`${CHANNEL}3`, player)
 			.catch(error => console.log('ERROR', error));
 		expect(result).toEqual(10);
 	});
@@ -357,7 +357,7 @@ describe('Unit tests with redis', () => {
 				'Northwest-Territory': { name: 'Northwest-Territory', type: 2 }
 			},
 		};
-		const player = await PlayerSnapshot(map, deck).get(publisher1, `${CHANNEL}3`, { token: '12345' });
+		const player = await PlayerSnapshot(publisher1, map, deck).get(`${CHANNEL}3`, { token: '12345' });
 		console.log(player);
 		expect(player).toEqual(expected);
 	});
@@ -376,13 +376,13 @@ describe('Unit tests with redis', () => {
 			const card = cards.pop();
 			if (card && player.cards) player.cards[card.name] = card;
 		}
-		const result = await PlayerSnapshot(map, deck).put(publisher1, `${CHANNEL}3`, player)
+		const result = await PlayerSnapshot(publisher1, map, deck).put(`${CHANNEL}3`, player)
 			.catch(error => console.log('ERROR', error));
 		expect(result).toEqual(10);
 	});
 
 	it('list players', async () => {
-		const result = await PlayerSnapshot(map, deck).list(publisher1, `${CHANNEL}3`);
+		const result = await PlayerSnapshot(publisher1, map, deck).list(`${CHANNEL}3`);
 		for (const player of Object.values(result)) {
 			console.log('List players:', JSON.stringify(player, null, ' '));
 		}
@@ -390,7 +390,7 @@ describe('Unit tests with redis', () => {
 	});
 
 	it('write Game object into redis', async () => {
-		const players = await PlayerSnapshot(map, deck).list(publisher1, `${CHANNEL}3`);
+		const players = await PlayerSnapshot(publisher1, map, deck).list(`${CHANNEL}3`);
 		const game: Game = {
 			token: '67890',
 			name: 'Game One',
@@ -401,14 +401,14 @@ describe('Unit tests with redis', () => {
 			cards: shuffleDeck(deck)
 		};
 		players['12345'].joined = game;
-		const result = await GameSnapshot(deck).put(publisher1, `${CHANNEL}3`, game)
+		const result = await GameSnapshot(publisher1, deck).put(`${CHANNEL}3`, game)
 			.catch(error => console.log('ERROR', error));
 		expect(result).toEqual(52);
 	});
 
 	it('read Game object from redis', async () => {
-		const players = await PlayerSnapshot(map, deck).list(publisher1, `${CHANNEL}3`);
-		const game = await GameSnapshot(deck).get(publisher1, `${CHANNEL}3`, { token: '67890' });
+		const players = await PlayerSnapshot(publisher1, map, deck).list(`${CHANNEL}3`);
+		const game = await GameSnapshot(publisher1, deck).get(`${CHANNEL}3`, { token: '67890' });
 		expect(game.token).toEqual('67890');
 		expect(game.name).toEqual('Game One');
 		expect(game.host).toEqual('12345');
@@ -418,8 +418,8 @@ describe('Unit tests with redis', () => {
 	});
 
 	it('list games', async () => {
-		const players = await PlayerSnapshot(map, deck).list(publisher1, `${CHANNEL}3`);
-		const result = await GameSnapshot(deck).list(publisher1, `${CHANNEL}3`);
+		const players = await PlayerSnapshot(publisher1, map, deck).list(`${CHANNEL}3`);
+		const result = await GameSnapshot(publisher1, deck).list(`${CHANNEL}3`);
 		for (const game of Object.values(result)) {
 			console.log('List game:', JSON.stringify(game, null, ' '));
 		}
@@ -474,6 +474,11 @@ describe('Subscription tests', () => {
 	let publisher2: Redis;
 	let commitStore;
 	let subscription: any;
+	let commit1: Commit;
+	let commit2: Commit;
+	let commit3: Commit;
+	let commit4: Commit;
+	let commit5: Commit;
 
 	beforeAll(async () => {
 		publisher2 = new RedisClient({ host, port });
@@ -488,15 +493,26 @@ describe('Subscription tests', () => {
 	});
 
 	it('create 3 players then delete one', async () => {
-		const commit1 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.RegisterPlayer({ playerName: 'john' }));
-		const commit2 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.RegisterPlayer({ playerName: 'joe' }));
-		const commit3 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.RegisterPlayer({ playerName: 'josh' }));
+		commit1 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.RegisterPlayer({ playerName: 'john' }));
+		commit2 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.RegisterPlayer({ playerName: 'joe' }));
+		commit3 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.RegisterPlayer({ playerName: 'josh' }));
 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-		const commit4 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.PlayerLeave({ playerToken: commit2.id }));
+		await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.PlayerLeave({ playerToken: commit2.id }));
 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-		const result = await PlayerSnapshot(map, deck).list(publisher2, `${CHANNEL}5`);
+		const result = await PlayerSnapshot(publisher2, map, deck).list(`${CHANNEL}5`);
 		console.log('Create 3 players then delete one', JSON.stringify(result, null, ' '));
 		expect(Object.values(result).length).toEqual(2);
+	});
+
+	it('create 2 games then delete one', async () => {
+		commit4 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.OpenGame({ playerToken: commit1.id, gameName: 'John\'s game' }));
+		commit5 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.OpenGame({ playerToken: commit3.id, gameName: 'Josh\'s game' }));
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.CloseGame({ playerToken: commit3.id, gameToken: commit5.id }));
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		const result = await GameSnapshot(publisher2, deck).list(`${CHANNEL}5`);
+		console.log('Create 2 games then delete one', JSON.stringify(result, null, ' '));
+		expect(Object.values(result).length).toEqual(1);
 	});
 });
 

@@ -26,8 +26,8 @@ export const Subscription = (
 								if (!subscribers[channel].ready) {
 									reject(new Error(`Subscription ${channel} not ready`));
 								} else {
-									const playerList = await PlayerSnapshot(map, deck).list(client, channel);
-									const gameList = await GameSnapshot(deck).list(client, channel);
+									const playerList = await PlayerSnapshot(client, map, deck).list(channel);
+									const gameList = await GameSnapshot(client, deck).list(channel);
 
 									const result = await client.zrangebyscore(
 										`${channel}:Commit`,
@@ -39,10 +39,10 @@ export const Subscription = (
 
 									const { players, games, messages } = reducer(deck)(incomings, { players: playerList, games: gameList });
 									for (const player of Object.values(players)) {
-										await PlayerSnapshot(map, deck).put(client, channel, player);
+										await PlayerSnapshot(client, map, deck).put(channel, player);
 									}
 									for (const game of Object.values(games)) {
-										await GameSnapshot(deck).put(client, channel, game);
+										await GameSnapshot(client, deck).put(channel, game);
 									}
 									for (const message of messages) {
 										await MessageSnapshot.put(client, channel, message);

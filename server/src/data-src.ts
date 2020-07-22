@@ -29,8 +29,8 @@ export class EntityDS extends DataSource {
 			try {
 				const noti = JSON.parse(message);
 				if (isNotification(noti)) {
-					const playerList = await PlayerSnapshot(map, deck).list(this.client, channel);
-					const gameList = await GameSnapshot(deck).list(this.client, channel);
+					const playerList = await PlayerSnapshot(this.client, map, deck).list(channel);
+					const gameList = await GameSnapshot(this.client, deck).list(channel);
 
 					this.client.zrangebyscore(
 						channel, (this.lastPos >= 0) ? this.lastPos : '-inf', noti.timestamp, 'WITHSCORES', (error, result) => {
