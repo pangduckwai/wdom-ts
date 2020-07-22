@@ -15,7 +15,7 @@ const createCommit = () => {
 	};
 
 	const build = (): Commit => {
-		if (commit.events.length < 1)  throw new Error('createCommit Invalid parameter(s)');
+		if (commit.events.length < 1)  throw new Error('[createCommit] Invalid parameter(s)');
 		return commit;
 	}
 

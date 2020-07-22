@@ -1,117 +1,166 @@
 import { Redis } from 'ioredis';
 import { Card, Territories, WildCards } from '../rules';
 import { isEmpty } from '..';
-import { Player } from '.';
+import { isPlayer, Player, Status } from '.';
 
 export interface Game {
 	token: string;
 	name: string;
-	host: Player;
+	host: Player | string;
 	round: number; // -1
 	redeemed: number; // 0
+	status: Status;
 	cards?: Card[]; // the deck has to be shuffled, thus need array
 };
 
-// KEYS[1] - Game (by Token)
-// KEYS[2] - Game Index (by Name)
-// ARGV    - toekn, name, host, round, redeemed, cards?
-const put = `
-local idx = 7
+export const isGame = (variable: any): variable is Game => {
+	const val = variable as Game;
+	return (val.token !== undefined) &&
+		(val.name !== undefined) &&
+		(val.host !== undefined) &&
+		(val.round !== undefined) &&
+		(val.redeemed !== undefined) &&
+		(val.status !== undefined);
+};
+
+// KEYS[1] - Player (by Token)
+// KEYS[2] - Player Index (by Name)
+const del = `
 local rst = 0
 
-if redis.call("hset", KEYS[2], ARGV[3], ARGV[2]) == 1 then
+if redis.call("hdel", KEYS[2], ARGV[1]) == 1 then
 	rst = rst + 1
 end
 
-if redis.call("hset", KEYS[1], "token", ARGV[2]) == 1 then rst = rst + 1 end
-if redis.call("hset", KEYS[1], "name", ARGV[3]) == 1 then rst = rst + 1 end
-if redis.call("hset", KEYS[1], "host", ARGV[4]) == 1 then rst = rst + 1 end
-if redis.call("hset", KEYS[1], "round", ARGV[5]) == 1 then rst = rst + 1 end
-if redis.call("hset", KEYS[1], "redeemed", ARGV[6]) == 1 then rst = rst + 1 end
+if redis.call("del", KEYS[1]) == 1 then
+	rst = rst + 1
+end
 
-if redis.call("hset", KEYS[1], "cardsCnt", ARGV[1]) == 1 then
+return rst`;
+
+// KEYS[1] - Game (by Token)
+// KEYS[2] - Game Index (by Name)
+// ARGV    - token, name, host, round, redeemed, cards?
+const put = `
+local idx = 8
+local rst = 0
+
+if redis.call("hset", KEYS[2], ARGV[3], ARGV[2]) >= 0 then
+	rst = rst + 1
+end
+
+if redis.call("hset", KEYS[1], "token", ARGV[2]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "name", ARGV[3]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "host", ARGV[4]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "round", ARGV[5]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "redeemed", ARGV[6]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "status", ARGV[7]) >= 0 then rst = rst + 1 end
+
+if redis.call("hset", KEYS[1], "cardsCnt", ARGV[1]) >= 0 then
 	rst = rst + 1
 end
 for i = 1, ARGV[1] do
-	if redis.call("hset", KEYS[1], "cards" .. i, ARGV[idx]) == 1 then
+	if redis.call("hset", KEYS[1], "cards" .. i, ARGV[idx]) >= 0 then
 		rst = rst + 1
 	end
 	idx = idx + 1
 end
 
-return rst
-`;
+return rst`;
 
-export const GameSnapshot = {
-	exists: async (client: Redis, channel: string, game: Game): Promise<boolean> =>
-		(await client.hexists(`${channel}:Game:Name`, game.name) === 1),
-	list: async (
-		client: Redis, channel: string,
-		deck: Record<Territories | WildCards, Card>,
-		players?: Record<string, Player>
-	): Promise<Record<string, Game>> => {
-		return new Promise<Record<string, Game>>(async (resolve) => {
-			const results = await client.hgetall(`${channel}:Player:Name`);
-			const games: Record<string, Game> = {};
-			for (const token of Object.values(results)) {
-				games[token] = await GameSnapshot.get(client, channel, { token }, deck, players);
-			}
-			resolve(games);
-		});
-	},
-	put: async (client: Redis, channel: string, {
-		token, name, host, round, redeemed, cards
-	}: Game): Promise<number> => {
-		return new Promise<number>(async (resolve, reject) => {
-			const card = cards ? Object.keys(cards) : [];
-			const args = [
-				`${channel}:Game:${token}`,
-				`${channel}:Game:Name`,
-				card.length,
-				token, name, host.token, round, redeemed
-			];
-			if (cards) args.push(...card);
-
-			const expect = 7 + card.length;
-			const result = await client.eval(put, 2, args);
-			if (result === expect)
-				resolve(result);
-			else
-				reject(new Error(`[GameSnapshot] Unknown error, expect ${expect} writes from redis, got ${result}`));
-		});
-	},
-	get: async (client: Redis, channel: string, { token, name }: {token?: string; name?: string },
-		deck: Record<Territories | WildCards, Card>,
-		players?: Record<string, Player>
-	): Promise<Game> => {
-		return new Promise<Game>(async (resolve, reject) => {
-			if (!token && name) token = await client.hget(`${channel}:Game:Name`, name) || undefined;
-			if (!token)
-				reject(new Error(`[GameSnapshot] Unable to obtain game token for [${token} / ${name}]`));
-			else if (!players)
-				reject(new Error(`[GameSnapshot] Unable to get game, host is not an optional field`));
-			else {
-				const result = await client.hgetall(`${channel}:Game:${token}`);
-				if (!isEmpty(result)) {
-					const game: Game = {
-						token: result.token,
-						name: result.name,
-						host: players[result.host],
-						round: parseInt(result.round, 10),
-						redeemed: parseInt(result.redeemed, 10),
-					};
-
-					const cards: Card[] = [];
-					for (let i = 1; i <= parseInt(result.cardsCnt); i ++) {
-						cards.push(deck[result[`cards${i}`] as Territories | WildCards]);
-					}
-					if (parseInt(result.cardsCnt) > 0) game.cards = cards;
-
-					resolve(game);
-				} else {
-					reject(new Error(`[GameSnapshot] Failed to retrieve game ${token}`));
+export const GameSnapshot = (
+	deck: Record<Territories | WildCards, Card>,
+) => {
+	return {
+		exists: async (client: Redis, channel: string, game: Game): Promise<boolean> =>
+			(await client.hexists(`${channel}:Game:Name`, game.name) === 1),
+		list: (client: Redis, channel: string): Promise<Record<string, Game>> => {
+			return new Promise<Record<string, Game>>(async (resolve) => {
+				const results = await client.hgetall(`${channel}:Game:Name`);
+				const games: Record<string, Game> = {};
+				for (const token of Object.values(results)) {
+					games[token] = await GameSnapshot(deck).get(client, channel, { token });
 				}
+				resolve(games);
+			});
+		},
+		delete: (client: Redis, channel: string, game: Game): Promise<number> => {
+			return new Promise<number>(async (resolve, reject) => {
+				if (game.status !== Status.Deleted) {
+					reject(new Error(`[GameSnapshot] Operation mismatched: ${game.token}`));
+				} else {
+					const result = await client.eval(del, 2, [
+						`${channel}:Game:${game.token}`,
+						`${channel}:Game:Name`,
+						game.name
+					]);
+					if (result === 2)
+						resolve(result);
+					else
+						reject(new Error(`[GameSnapshot] Unknown error, expect 2 deletes from redis, got ${result}`));
+				}
+			});
+		},
+		put: (client: Redis, channel: string, {
+			token, name, host, round, redeemed, cards, status
+		}: Game): Promise<number> => {
+			if (status === Status.Deleted) {
+				return GameSnapshot(deck).delete(client, channel, {
+					token, name, host, round, redeemed, cards, status
+				});
+			} else {
+				return new Promise<number>(async (resolve, reject) => {
+					const card = cards ? Object.values(cards).map(c => c.name) : [];
+					const args = [
+						`${channel}:Game:${token}`,
+						`${channel}:Game:Name`,
+						card.length,
+						token, name,
+						isPlayer(host) ? host.token : host,
+						round, redeemed, status
+					];
+					if (cards) args.push(...card);
+
+					const expect = 8 + card.length;
+					const result = await client.eval(put, 2, args);
+					if (result === expect)
+						resolve(result);
+					else
+						reject(new Error(`[GameSnapshot] Unknown error, expect ${expect} writes from redis, got ${result}`));
+				});
 			}
-		});
-	}
+		},
+		get: (client: Redis, channel: string, { token, name }: {token?: string; name?: string }): Promise<Game> => {
+			return new Promise<Game>(async (resolve, reject) => {
+				if (!token && name) token = await client.hget(`${channel}:Game:Name`, name) || undefined;
+				if (!token)
+					reject(new Error(`[GameSnapshot] Unable to obtain game token for [${token} / ${name}]`));
+				// else if (!players)
+				// 	reject(new Error(`[GameSnapshot] Unable to get game, host is not an optional field`));
+				else {
+					const result = await client.hgetall(`${channel}:Game:${token}`);
+					if (!isEmpty(result)) {
+						const game: Game = {
+							token: result.token,
+							name: result.name,
+							host: result.host,
+							round: parseInt(result.round, 10),
+							redeemed: parseInt(result.redeemed, 10),
+							status: parseInt(result.status)
+						};
+
+						const cards: Card[] = [];
+						for (let i = 1; i <= parseInt(result.cardsCnt); i ++) {
+							cards.push(deck[result[`cards${i}`] as Territories | WildCards]);
+						}
+						if (parseInt(result.cardsCnt) > 0) game.cards = cards;
+
+						resolve(game);
+					} else {
+						reject(new Error(`[GameSnapshot] Failed to retrieve game ${token}`));
+					}
+				}
+			});
+		}
+	};
 };

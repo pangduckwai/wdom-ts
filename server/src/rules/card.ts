@@ -18,8 +18,8 @@ export interface Card {
 	type: CardTypes;
 };
 
-export const shuffleDeck = (): Card[] => {
-	const cards = Object.values(buildDeck());
+export const shuffleDeck = (deck: Record<WildCards | Territories, Card>): Card[] => {
+	const cards = Object.values(deck);
 	let size = cards.length;
 
 	while (size > 0) {
