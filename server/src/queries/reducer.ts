@@ -52,6 +52,7 @@ export const reducer = (
 								round: -1,
 								redeemed: 0,
 								status: Status.New,
+								players: [players[event.payload.playerToken]],
 								cards: shuffleDeck(deck)
 							};
 							players[event.payload.playerToken].joined = games[commit.id];
@@ -91,6 +92,7 @@ export const reducer = (
 							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} already full`));
 						} else {
 							players[event.payload.playerToken].joined = games[event.payload.gameToken];
+							games[event.payload.gameToken].players.push(players[event.payload.playerToken]);
 						}
 						break;
 

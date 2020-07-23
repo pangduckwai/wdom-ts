@@ -8,6 +8,7 @@
 		"clean": "rimraf dist",
 		"unit-test": "jest unit-test",
 		"commands-test": "jest commands-test",
+		"speed-test": "node ./dist/__tests__/speed-runs.js",
 		"test": "jest",
 		"sim": "jest simulation",
 		"start": "nodemon dist/server.js",

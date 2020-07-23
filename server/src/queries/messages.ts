@@ -100,8 +100,7 @@ else
 	else
 		return redis.error_reply("[MessageSnapshot] unknown error when writing message (".. count .. ")")
 	end
-end
-`;
+end`;
 
 export const MessageSnapshot = {
 	put: (client: Redis, channel: string, message: Message): Promise<Message> => {

@@ -2,7 +2,8 @@ require('dotenv').config();
 jest.mock('../rules/card');
 import fetch from 'node-fetch';
 import { commandService } from '../commands';
-import { shuffleDeck } from '../rules';
+import { Game, Player, Status, isPlayer } from '../queries';
+import { buildDeck, shuffleDeck } from '../rules';
 import {
 	REGISTER_PLAYER, PLAYER_LEAVE, OPEN_GAME, JOIN_GAME, CLOSE_GAME, QUIT_GAME, START_GAME, ASSIGN_TERRITORY
 } from './utils';
@@ -14,24 +15,17 @@ const servicePort = 4031; // (process.env.COMMANDS_PORT || 4000) as number;
 const SERVICE = `http://localhost:${servicePort}/graphql`;
 let stopService: () => Promise<number>;
 
-const players: any = {
-	pete: { id: '', holding: [] }, // game
-	josh: { id: '', holding: [] }, // game
-	saul: { id: '', holding: [] }, // game
-	jess: { id: '', holding: [] },
-	bill: { id: '', holding: [] }, // leave
-	matt: { id: '', holding: [] },
-	nick: { id: '', holding: [] },
-	dick: { id: '', holding: [] }, // not in game
-	dave: { id: '', holding: [] }, // leave
-	john: { id: '', holding: [] },
-	mike: { id: '', holding: [] },
+// pete: ['jess']
+// josh: ['josh', 'matt'] // 'nick', 'mike', 'john', 'saul'
+// saul: ['nick', 'mike', 'john']
+const playerNames = ['pete', 'josh', 'saul', 'jess', 'bill', 'matt', 'nick', 'dick', 'dave', 'john', 'mike'];
+const gameHosts: Record<string, string[]> = {
+	'pete': ['jess'],
+	'josh': ['matt'], // 'nick', 'mike', 'john', 'saul'
+	'saul': ['nick', 'mike', 'john']
 };
-const games: any = {
-	pete: { id: '', members: ['jess'] },
-	josh: { id: '', members: ['josh', 'matt'] }, // 'nick', 'mike', 'john', 'saul'
-	saul: { id: '', members: ['nick', 'mike', 'john'] },
-}
+let players: Record<string, Player> = {};
+let games: Record<string, Game> = {};
 
 beforeAll(async () => {
 	const { start, stop } = await commandService({ channel: CHANNEL, redisHost, redisPort, servicePort});
@@ -46,14 +40,18 @@ afterAll(async () => {
 	await stopService();
 	return new Promise((resolve) => setTimeout(() => {
 		console.log(`Unit test of channel ${CHANNEL} finished`);
-		console.log(`players: ${Object.keys(players).map(p => `\n "${p}": "${players[p].holding}"`)};\ngames:${Object.keys(games).map(k => `\n "${k}": "${games[k].members}"`)}`)
+		console.log(`players: ${Object.keys(players).map(p =>
+			`\n "${p}": "${players[p].holdings}"`)};\ngames:${Object.keys(games).map(k => {
+				const player = games[k].players.map(p => isPlayer(p) ? p.name : p);
+				return `\n "${k}": (${games[k].round}) "${JSON.stringify(player)}"`;
+			})}`);
 		resolve();
 	}, 100));
 });
 
 describe('Commands Service tests - Players', () => {
 	it('players register in game room', async () => {
-		for (const playerName of Object.keys(players)) {
+		for (const playerName of playerNames) {
 			await fetch(SERVICE, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
@@ -63,15 +61,20 @@ describe('Commands Service tests - Players', () => {
 			})})
 			.then(res => res.json())
 			.then(({ data }) => {
-				players[playerName].id = data.registerPlayer.id;
+				players[playerName] = {
+					token: data.registerPlayer.id,
+					name: playerName,
+					reinforcement: 0,
+					status: Status.New
+				};
 				expect(data.registerPlayer.id).toBeDefined();
 			}).catch(_ => expect(false).toBeTruthy());
 		}
 	});
 
 	it('players leave game room', async () => {
-		for (const name of ['bill', 'dave']) {
-			const playerToken = players[name].id;
+		for (const playerName of ['bill', 'dave']) {
+			const playerToken = players[playerName].token;
 			await fetch(SERVICE, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
@@ -81,6 +84,7 @@ describe('Commands Service tests - Players', () => {
 			})})
 			.then(res => res.json())
 			.then(({ data }) => {
+				delete players[playerName];
 				expect(data.leaveGameRoom.id).toBeDefined();
 			}).catch(_ => expect(false).toBeTruthy());
 		}
@@ -121,28 +125,36 @@ describe('Commands Service tests - Players', () => {
 
 describe('Commands Service tests - Prepare Games', () => {
 	it('players open games', async () => {
-		for (const playerName of Object.keys(games)) {
-			const playerToken = players[playerName].id;
+		for (const hostName of Object.keys(gameHosts)) {
+			const hostToken = players[hostName].token;
 			await fetch(SERVICE, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({
 					operationName: 'OpenGame', query: OPEN_GAME,
-					variables: { playerToken, gameName: `${playerName}\'s game` }
+					variables: { playerToken: hostToken, gameName: `${hostName}\'s game` }
 			})})
 			.then(res => res.json())
 			.then(({ data }) => {
-				games[playerName].id = data.openGame.id;
+				games[hostName] = {
+					token: data.openGame.id,
+					name: `${hostName}\'s game`,
+					host: hostToken,
+					round: -1,
+					redeemed: 0,
+					status: Status.New,
+					players: [players[hostName]]
+				};
 				expect(data.openGame.id).toBeDefined();
 			}).catch(_ => expect(false).toBeTruthy());
 		}
 	});
 
 	it('players join games', async () => {
-		for (const gameName of Object.keys(games)) {
-			for (const playerName of games[gameName].members) {
-				const playerToken = players[playerName].id;
-				const gameToken = games[gameName].id;
+		for (const hostName of Object.keys(gameHosts)) {
+			for (const playerName of gameHosts[hostName]) {
+				const playerToken = players[playerName].token;
+				const gameToken = games[hostName].token;
 				await fetch(SERVICE, {
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
@@ -152,6 +164,8 @@ describe('Commands Service tests - Prepare Games', () => {
 				})})
 				.then(res => res.json())
 				.then(({ data }) => {
+					players[playerName].joined = games[hostName];
+					games[hostName].players.push(players[playerName]);
 					expect(data.joinGame.id).toBeDefined();
 				}).catch(_ => expect(false).toBeTruthy());
 			}
@@ -164,7 +178,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'JoinGame', query: JOIN_GAME,
-				variables: { playerToken: players['pete'].id, gameToken: games['pete'].id }
+				variables: { playerToken: players['pete'].token, gameToken: games['pete'].token }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -178,10 +192,11 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'CloseGame', query: CLOSE_GAME,
-				variables: { playerToken: players['saul'].id, gameToken: games['saul'].id }
+				variables: { playerToken: players['saul'].token, gameToken: games['saul'].token }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
+			delete games['saul'];
 			expect(data.closeGame.id).toBeDefined();
 		}).catch(_ => expect(false).toBeTruthy());
 	});
@@ -192,7 +207,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'CloseGame', query: CLOSE_GAME,
-				variables: { playerToken: players['matt'].id, gameToken: games['josh'].id }
+				variables: { playerToken: players['matt'].token, gameToken: games['josh'].token }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -201,10 +216,10 @@ describe('Commands Service tests - Prepare Games', () => {
 	});
 
 	it('players join another game', async () => {
-		const names = [...games['saul'].members, 'saul'];
+		const names = [...gameHosts['saul'], 'saul'];
 		for (const playerName of names) {
-			const playerToken = players[playerName].id;
-			const gameToken = games['josh'].id;
+			const playerToken = players[playerName].token;
+			const gameToken = games['josh'].token;
 			await fetch(SERVICE, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
@@ -214,7 +229,8 @@ describe('Commands Service tests - Prepare Games', () => {
 			})})
 			.then(res => res.json())
 			.then(({ data }) => {
-				games['josh'].members.push(playerName);
+				players[playerName].joined = games['josh'];
+				games['josh'].players.push(players[playerName]);
 				expect(data.joinGame.id).toBeDefined();
 			}).catch(_ => expect(false).toBeTruthy());
 		}
@@ -226,10 +242,12 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'QuitGame', query: QUIT_GAME,
-				variables: { playerToken: players['jess'].id, gameToken: games['pete'].id }
+				variables: { playerToken: players['jess'].token, gameToken: games['pete'].token }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
+			players['jess'].joined = undefined;
+			games['pete'].players = games['pete'].players.filter(p => isPlayer(p) ? p.token !== players['jess'].token : p !== players['jess'].token);
 			expect(data.quitGame.id).toBeDefined();
 		}).catch(_ => expect(false).toBeTruthy());
 	});
@@ -240,7 +258,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'QuitGame', query: QUIT_GAME,
-				variables: { playerToken: players['pete'].id, gameToken: games['pete'].id }
+				variables: { playerToken: players['pete'].token, gameToken: games['pete'].token }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -254,7 +272,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'QuitGame', query: QUIT_GAME,
-				variables: { playerToken: players['dick'].id, gameToken: games['josh'].id }
+				variables: { playerToken: players['dick'].token, gameToken: games['josh'].token }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -268,7 +286,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'StartGame', query: START_GAME,
-				variables: { playerToken: players['matt'].id, gameToken: games['josh'].id }
+				variables: { playerToken: players['matt'].token, gameToken: games['josh'].token }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -282,7 +300,7 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'JoinGame', query: JOIN_GAME,
-				variables: { playerToken: players['jess'].id, gameToken: games['josh'].id }
+				variables: { playerToken: players['jess'].token, gameToken: games['josh'].token }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
@@ -296,32 +314,34 @@ describe('Commands Service tests - Prepare Games', () => {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				operationName: 'StartGame', query: START_GAME,
-				variables: { playerToken: players['josh'].id, gameToken: games['josh'].id }
+				variables: { playerToken: players['josh'].token, gameToken: games['josh'].token }
 		})})
 		.then(res => res.json())
 		.then(({ data }) => {
+			games['josh'].round = 0;
 			expect(data.startGame.id).toBeDefined();
 		}).catch(_ => expect(false).toBeTruthy());
 	});
 });
 
-describe('Commands Service tests - Prepare Games', () => {
-	it('assign territories', async () => {
-		let p = 0
-		for (const card of shuffleDeck()) {
-			await fetch(SERVICE, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({
-					operationName: 'AssignTerritory', query: ASSIGN_TERRITORY,
-					variables: { playerToken: players[games['josh'].members[p]].id, gameToken: games['josh'].id, territoryName: card.name }
-			})})
-			.then(res => res.json())
-			.then(({ data }) => {
-				players[games['josh'].members[p]].holding.push(card.name);
-				p = (p+1) % games['josh'].members.length;
-				expect(data.assignTerritory.id).toBeDefined();
-			}).catch(_ => expect(false).toBeTruthy());
-		}
-	});
-});
+// describe('Commands Service tests - Prepare Games', () => {
+// 	it('assign territories', async () => {
+// 		let p = 0
+// 		for (const card of shuffleDeck(buildDeck())) {
+// 			const player = games['josh'].players[p];
+// 			await fetch(SERVICE, {
+// 				method: 'POST',
+// 				headers: { 'content-type': 'application/json' },
+// 				body: JSON.stringify({
+// 					operationName: 'AssignTerritory', query: ASSIGN_TERRITORY,
+// 					variables: { playerToken: isPlayer(player) ? player.token : player, gameToken: games['josh'].token, territoryName: card.name }
+// 			})})
+// 			.then(res => res.json())
+// 			.then(({ data }) => {
+// 				if (isPlayer(player)) player.holdings?[card.name] = ;
+// 				p = (p+1) % games['josh'].players.length;
+// 				expect(data.assignTerritory.id).toBeDefined();
+// 			}).catch(_ => expect(false).toBeTruthy());
+// 		}
+// 	});
+// });

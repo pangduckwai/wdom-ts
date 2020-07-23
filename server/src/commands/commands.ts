@@ -1,4 +1,4 @@
-import { shuffleDeck } from '../rules';
+import { shuffleDeck, Territories, WildCards } from '../rules';
 import {
 	BaseEvent, Commit, generateToken, PlayerRegistered, PlayerLeft,
 	GameOpened, GameClosed, GameJoined, GameQuitted, GameStarted,
@@ -66,10 +66,16 @@ export const Commands = {
 			type: 'GameStarted',
 			payload
 		});
-		for (const card of shuffleDeck()) { // Need to do it here because need to record each card in a event, otherwise cannot replay
+		for (const card of WildCards) { // Need to do it here because need to record each card in a event, otherwise cannot replay
 			addEvent<CardReturned>({
 				type: 'CardReturned',
-				payload: { gameToken: payload.gameToken, cardName: card.name }
+				payload: { gameToken: payload.gameToken, cardName: card }
+			});
+		}
+		for (const card of Territories) { // Need to do it here because need to record each card in a event, otherwise cannot replay
+			addEvent<CardReturned>({
+				type: 'CardReturned',
+				payload: { gameToken: payload.gameToken, cardName: card }
 			});
 		}
 		return build();

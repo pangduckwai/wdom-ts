@@ -10,6 +10,7 @@ export interface Game {
 	round: number; // -1
 	redeemed: number; // 0
 	status: Status;
+	players: (Player | string)[]; // use array because use this to also remember the order of turns
 	cards?: Card[]; // the deck has to be shuffled, thus need array
 };
 
@@ -40,21 +41,21 @@ return rst`;
 
 // KEYS[1] - Game (by Token)
 // KEYS[2] - Game Index (by Name)
-// ARGV    - token, name, host, round, redeemed, cards?
+// ARGV    - token, name, host, round, redeemed, status, cards?, players?
 const put = `
-local idx = 8
+local idx = 9
 local rst = 0
 
-if redis.call("hset", KEYS[2], ARGV[3], ARGV[2]) >= 0 then
+if redis.call("hset", KEYS[2], ARGV[4], ARGV[3]) >= 0 then
 	rst = rst + 1
 end
 
-if redis.call("hset", KEYS[1], "token", ARGV[2]) >= 0 then rst = rst + 1 end
-if redis.call("hset", KEYS[1], "name", ARGV[3]) >= 0 then rst = rst + 1 end
-if redis.call("hset", KEYS[1], "host", ARGV[4]) >= 0 then rst = rst + 1 end
-if redis.call("hset", KEYS[1], "round", ARGV[5]) >= 0 then rst = rst + 1 end
-if redis.call("hset", KEYS[1], "redeemed", ARGV[6]) >= 0 then rst = rst + 1 end
-if redis.call("hset", KEYS[1], "status", ARGV[7]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "token", ARGV[3]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "name", ARGV[4]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "host", ARGV[5]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "round", ARGV[6]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "redeemed", ARGV[7]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "status", ARGV[8]) >= 0 then rst = rst + 1 end
 
 if redis.call("hset", KEYS[1], "cardsCnt", ARGV[1]) >= 0 then
 	rst = rst + 1
@@ -64,6 +65,16 @@ for i = 1, ARGV[1] do
 		rst = rst + 1
 	end
 	idx = idx + 1
+end
+
+if redis.call("hset", KEYS[1], "playersCnt", ARGV[2]) >= 0 then
+	rst = rst + 1
+end
+for i = 1, ARGV[2] do
+	if redis.call("hset", KEYS[1], "players" .. i, ARGV[idx]) >= 0 then
+		rst = rst + 1
+	end
+	idx = idx +1
 end
 
 return rst`;
@@ -103,31 +114,33 @@ export const GameSnapshot = (
 			});
 		},
 		put: (channel: string, {
-			token, name, host, round, redeemed, cards, status
+			token, name, host, round, redeemed, status, players, cards
 		}: Game): Promise<number> => {
 			if (status === Status.Deleted) {
 				return GameSnapshot(client, deck).delete(channel, {
-					token, name, host, round, redeemed, cards, status
+					token, name, host, round, redeemed, status, players, cards
 				});
 			} else {
 				return new Promise<number>(async (resolve, reject) => {
-					const card = cards ? Object.values(cards).map(c => c.name) : [];
+					const cnum = cards ? cards.length : 0;
+					const pnum = players.length;
 					const args = [
 						`${channel}:Game:${token}`,
 						`${channel}:Game:Name`,
-						card.length,
+						cnum, pnum,
 						token, name,
 						isPlayer(host) ? host.token : host,
 						round, redeemed, status
 					];
-					if (cards) args.push(...card);
+					if (cards) args.push(...cards.map(c => c.name));
+					args.push(...players.map(p => isPlayer(p) ? p.name : p));
 
-					const expect = 8 + card.length;
+					const expected = 9 + cnum + pnum;
 					const result = await client.eval(put, 2, args);
-					if (result === expect)
+					if (result === expected)
 						resolve(result);
 					else
-						reject(new Error(`[GameSnapshot] Unknown error, expect ${expect} writes from redis, got ${result}`));
+						reject(new Error(`[GameSnapshot] Unknown error, expect ${expected} writes from redis, got ${result}`));
 				});
 			}
 		},
@@ -147,14 +160,19 @@ export const GameSnapshot = (
 							host: result.host,
 							round: parseInt(result.round, 10),
 							redeemed: parseInt(result.redeemed, 10),
-							status: parseInt(result.status)
+							status: parseInt(result.status),
+							players: []
 						};
 
 						const cards: Card[] = [];
 						for (let i = 1; i <= parseInt(result.cardsCnt); i ++) {
 							cards.push(deck[result[`cards${i}`] as Territories | WildCards]);
 						}
-						if (parseInt(result.cardsCnt) > 0) game.cards = cards;
+						if (cards.length > 0) game.cards = cards;
+
+						for (let i = 1; i <= parseInt(result.playersCnt); i ++) {
+							game.players.push(result[`players${i}`]);
+						}
 
 						resolve(game);
 					} else {

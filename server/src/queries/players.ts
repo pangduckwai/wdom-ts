@@ -172,13 +172,13 @@ export const PlayerSnapshot = (
 						for (let i = 1; i <= parseInt(result.holdingsCnt); i ++) {
 							holdings[result[`cards${i}`]] = map[result[`holdings${i}`] as Territories];
 						}
-						if (parseInt(result.holdingsCnt) > 0) player.holdings = holdings;
+						if (Object.keys(holdings).length > 0) player.holdings = holdings;
 
 						const cards: Record<string, Card> = {};
 						for (let i = 1; i <= parseInt(result.cardsCnt); i ++) {
 							cards[result[`cards${i}`]] = deck[result[`cards${i}`] as Territories | WildCards];
 						}
-						if (parseInt(result.cardsCnt) > 0) player.cards = cards;
+						if (Object.keys(cards).length > 0) player.cards = cards;
 
 						resolve(player);
 					} else {

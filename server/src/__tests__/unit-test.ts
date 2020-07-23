@@ -398,12 +398,13 @@ describe('Unit tests with redis', () => {
 			round: -1,
 			redeemed: 0,
 			status: Status.New,
+			players: [players['12345']],
 			cards: shuffleDeck(deck)
 		};
 		players['12345'].joined = game;
 		const result = await GameSnapshot(publisher1, deck).put(`${CHANNEL}3`, game)
 			.catch(error => console.log('ERROR', error));
-		expect(result).toEqual(52);
+		expect(result).toEqual(54);
 	});
 
 	it('read Game object from redis', async () => {
