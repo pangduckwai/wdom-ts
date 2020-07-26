@@ -18,18 +18,18 @@ export interface Card {
 	type: CardTypes;
 };
 
-export const shuffleDeck = (deck: Record<WildCards | Territories, Card>): Card[] => {
-	const cards = Object.values(deck);
-	let size = cards.length;
-
+export const shuffle = <K extends string, V>(source: Record<K, V>): V[] => {
+	return _shuffle(Object.values(source));
+};
+export const _shuffle = <T>(list: T[]): T[] => {
+	let size = list.length;
 	while (size > 0) {
-		const idx = Math.floor(Math.random() * size);
-		const temp = cards[-- size];
-		cards[size] = cards[idx];
-		cards[idx] = temp;
+		const indx = Math.floor(Math.random() * size);
+		const last = list[-- size];
+		list[size] = list[indx];
+		list[indx] = last;
 	}
-
-	return cards;
+	return list;
 };
 
 export const buildDeck = (): Record<WildCards | Territories, Card> => {

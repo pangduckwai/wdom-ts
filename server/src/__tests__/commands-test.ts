@@ -3,10 +3,17 @@ jest.mock('../rules/card');
 import fetch from 'node-fetch';
 import { commandService } from '../commands';
 import { Game, Player, Status, isPlayer } from '../queries';
-import { buildDeck, shuffleDeck } from '../rules';
+import { buildMap, shuffle, Territories, Territory } from '../rules';
 import {
 	REGISTER_PLAYER, PLAYER_LEAVE, OPEN_GAME, JOIN_GAME, CLOSE_GAME, QUIT_GAME, START_GAME, ASSIGN_TERRITORY
 } from './utils';
+
+/**
+ * This is NOT an integration test. In this test only the commands services is started. The purpose
+ * is to test commits can be successfully written to the backend. Thus the 'players' and 'games' objects
+ * are faked by updating them manually after each successful test. They are to remember the tokens for
+ * subsequence tests.
+ */
 
 const CHANNEL = `ctest${Date.now()}`;
 const redisHost = process.env.REDIS_HOST || 'localhost';
@@ -27,7 +34,7 @@ const gameHosts: Record<string, string[]> = {
 let players: Record<string, Player> = {};
 let games: Record<string, Game> = {};
 
-beforeAll(async () => {
+ beforeAll(async () => {
 	const { start, stop } = await commandService({ channel: CHANNEL, redisHost, redisPort, servicePort});
 	stopService = stop;
 
@@ -39,12 +46,18 @@ beforeAll(async () => {
 afterAll(async () => {
 	await stopService();
 	return new Promise((resolve) => setTimeout(() => {
-		console.log(`Unit test of channel ${CHANNEL} finished`);
-		console.log(`players: ${Object.keys(players).map(p =>
-			`\n "${p}": "${players[p].holdings}"`)};\ngames:${Object.keys(games).map(k => {
+		console.log(`Commands test of channel ${CHANNEL} finished`);
+		console.log(`players: ${
+			Object.keys(players).map(p => {
+				const holds = players[p].holdings;
+				return `\n "${p}": "${JSON.stringify(Object.keys(holds ? holds : {}))}"`;
+			})
+		};\ngames:${
+			Object.keys(games).map(k => {
 				const player = games[k].players.map(p => isPlayer(p) ? p.name : p);
 				return `\n "${k}": (${games[k].round}) "${JSON.stringify(player)}"`;
-			})}`);
+			})
+		}`);
 		resolve();
 	}, 100));
 });
@@ -324,24 +337,27 @@ describe('Commands Service tests - Prepare Games', () => {
 	});
 });
 
-// describe('Commands Service tests - Prepare Games', () => {
-// 	it('assign territories', async () => {
-// 		let p = 0
-// 		for (const card of shuffleDeck(buildDeck())) {
-// 			const player = games['josh'].players[p];
-// 			await fetch(SERVICE, {
-// 				method: 'POST',
-// 				headers: { 'content-type': 'application/json' },
-// 				body: JSON.stringify({
-// 					operationName: 'AssignTerritory', query: ASSIGN_TERRITORY,
-// 					variables: { playerToken: isPlayer(player) ? player.token : player, gameToken: games['josh'].token, territoryName: card.name }
-// 			})})
-// 			.then(res => res.json())
-// 			.then(({ data }) => {
-// 				if (isPlayer(player)) player.holdings?[card.name] = ;
-// 				p = (p+1) % games['josh'].players.length;
-// 				expect(data.assignTerritory.id).toBeDefined();
-// 			}).catch(_ => expect(false).toBeTruthy());
-// 		}
-// 	});
-// });
+describe('Commands Service tests - Prepare Games', () => {
+	it('assign territories', async () => {
+		let p = 0
+		for (const territory of shuffle<Territories, Territory>(buildMap())) {
+			const player = games['josh'].players[p];
+			await fetch(SERVICE, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					operationName: 'AssignTerritory', query: ASSIGN_TERRITORY,
+					variables: { playerToken: isPlayer(player) ? player.token : player, gameToken: games['josh'].token, territoryName: territory.name }
+			})})
+			.then(res => res.json())
+			.then(({ data }) => {
+				if (isPlayer(player)) {
+					if (!player.holdings) player.holdings = {};
+					player.holdings[territory.name] = territory;
+				}
+				p = (p+1) % games['josh'].players.length;
+				expect(data.assignTerritory.id).toBeDefined();
+			}).catch(_ => expect(false).toBeTruthy());
+		}
+	});
+});

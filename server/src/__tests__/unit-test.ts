@@ -3,7 +3,7 @@ jest.mock('../rules/card');
 import RedisClient, { Redis } from 'ioredis';
 import { Commands, Commit, CommitStore, isNotification, toCommits } from '../commands';
 import { Game, Player, PlayerSnapshot, reducer, GameSnapshot, MessageType, MessageSnapshot, Subscription, Status } from '../queries';
-import { buildContinents, buildDeck, buildMap, Continents, shuffleDeck, Territories, WildCards } from '../rules';
+import { buildContinents, buildDeck, buildMap, Card, Continents, _shuffle, shuffle, Territories, WildCards } from '../rules';
 import { CHANNEL, isEmpty } from '..';
 
 const host = process.env.REDIS_HOST;
@@ -12,7 +12,7 @@ const timestamp = Date.now();
 const mockInSubscriber = jest.fn();
 const map = buildMap();
 const deck = buildDeck();
-const cards = shuffleDeck(deck);
+const cards = shuffle<WildCards | Territories, Card>(deck);
 
 afterAll(async () => {
 	return new Promise((resolve) => setTimeout(() => {
@@ -108,7 +108,7 @@ describe('Programming behaviour tests', () => {
 			cards: {},
 			status: Status.New
 		};
-		const list = shuffleDeck(deck);
+		const list = shuffle<WildCards | Territories, Card>(deck);
 		for (let i = 0; i < 5; i ++) {
 			const card = list.pop();
 			if (card && player.cards) player.cards[card.name] = card;
@@ -128,6 +128,22 @@ describe('Programming behaviour tests', () => {
 		expect(isEmpty(v3)).toBeTruthy();
 		expect(isEmpty(v4)).toBeFalsy();
 		expect(isEmpty(v5)).toBeTruthy();
+	});
+
+	it('test const assertion', () => {
+		// This won't work: _shuffle(Territories);
+		const s = Territories.map(t => t);
+		const t = _shuffle(s);
+		console.log('const assertion', t);
+		expect(t[29]).toEqual('China');
+	});
+
+	it('test const assertion again', () => {
+		let count = 0
+		for (const card of [...WildCards, ...Territories]) {
+			if (count === 9) expect(card).toEqual('China');
+			count ++;
+		}
 	});
 });
 
@@ -218,9 +234,9 @@ describe('Unit tests with redis', () => {
 			commits.push(games[game]);
 		}
 		commits.push(Commands.PlayerLeave({ playerToken: players['matt'].id }));
-		commits.push(Commands.CloseGame({ playerToken: players['luke'].id, gameToken: games['luke'].id }));
+		commits.push(Commands.CloseGame({ playerToken: players['luke'].id }));
 		commits.push(Commands.JoinGame({ playerToken: players['dave'].id, gameToken: games['bill'].id }));
-		commits.push(Commands.QuitGame({ playerToken: players['dave'].id, gameToken: games['bill'].id }));
+		commits.push(Commands.QuitGame({ playerToken: players['dave'].id }));
 		commits.push(Commands.JoinGame({ playerToken: players['dave'].id, gameToken: games['pete'].id }));
 		commits.push(Commands.JoinGame({ playerToken: players['jess'].id, gameToken: games['josh'].id }));
 		commits.push(Commands.JoinGame({ playerToken: players['john'].id, gameToken: games['pete'].id }));
@@ -399,7 +415,7 @@ describe('Unit tests with redis', () => {
 			redeemed: 0,
 			status: Status.New,
 			players: [players['12345']],
-			cards: shuffleDeck(deck)
+			cards: shuffle<WildCards | Territories, Card>(deck)
 		};
 		players['12345'].joined = game;
 		const result = await GameSnapshot(publisher1, deck).put(`${CHANNEL}3`, game)
@@ -500,88 +516,19 @@ describe('Subscription tests', () => {
 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
 		await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.PlayerLeave({ playerToken: commit2.id }));
 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-		const result = await PlayerSnapshot(publisher2, map, deck).list(`${CHANNEL}5`);
-		console.log('Create 3 players then delete one', JSON.stringify(result, null, ' '));
-		expect(Object.values(result).length).toEqual(2);
+		const report = subscription.report(`${CHANNEL}5`);
+		// console.log('Create 3 players then delete one', JSON.stringify(report.players, null, ' '));
+		expect(Object.values(report.players).filter((p: any) => p.status !== Status.Deleted).length).toEqual(2);
 	});
 
 	it('create 2 games then delete one', async () => {
 		commit4 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.OpenGame({ playerToken: commit1.id, gameName: 'John\'s game' }));
 		commit5 = await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.OpenGame({ playerToken: commit3.id, gameName: 'Josh\'s game' }));
 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-		await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.CloseGame({ playerToken: commit3.id, gameToken: commit5.id }));
+		await CommitStore(publisher2).put(`${CHANNEL}5`, Commands.CloseGame({ playerToken: commit3.id }));
 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-		const result = await GameSnapshot(publisher2, deck).list(`${CHANNEL}5`);
-		console.log('Create 2 games then delete one', JSON.stringify(result, null, ' '));
-		expect(Object.values(result).length).toEqual(1);
+		const report = subscription.report(`${CHANNEL}5`);
+		// console.log('Create 2 games then delete one', JSON.stringify(report.games, null, ' '));
+		expect(Object.values(report.games).filter((g: any) => g.status !== Status.Deleted).length).toEqual(1);
 	});
 });
-
-	// it('write commits to redis, receive notifications, calculate snapshots', async () => {
-	// 	// expect.assertions(2);
-
-	// 	let lastPos: number = -1;
-	// 	let splayers: Record<string, Player> = {};
-	// 	let sgames: Record<string, Game> = {};
-	// 	let serrors: Record<string, Errors> = {};
-	// 	mockInSubscriber.mockImplementation((channel, message) => {
-	// 		const noti = JSON.parse(message);
-	// 		if (isNotification(noti)) {
-	// 			publisher12.zrangebyscore(
-	// 				channel, (lastPos >= 0) ? lastPos : '-inf', noti.timestamp, 'WITHSCORES', (error, result) => {
-	// 					if (error) {
-	// 						console.log(`[EntitiesDS.subscriber.on - message]: ${error}`);
-	// 					} else {
-	// 						const incomings = toCommits('[EntitiesDS.subscriber.on - message]', result);
-	// 						const { players, games, errors } = reducer(incomings, { players: splayers, games: sgames, errors: serrors });
-	// 						splayers = players;
-	// 						sgames = games;
-	// 						serrors = errors;
-	// 					}
-	// 				}
-	// 			);
-	// 			lastPos = noti.timestamp + 1;
-	// 		}
-	// 	});
-
-	// 	await subscriber.subscribe(`${CHANNEL}2`);
-	// 	await new Promise((resolve) => setTimeout(() => resolve(), 100));
-
-	// 	const commit0 = Commands.RegisterPlayer({ playerName: 'john' });
-	// 	const commit1 = Commands.RegisterPlayer({ playerName: 'pete' });
-	// 	const commit2 = Commands.RegisterPlayer({ playerName: 'josh' });
-	// 	const commit4 = Commands.RegisterPlayer({ playerName: 'jess' });
-	// 	const commit3 = Commands.OpenGame({ playerToken: commit2.id, gameName: 'Josh\'s game' });
-	// 	const commit5 = Commands.OpenGame({ playerToken: commit4.id, gameName: 'Josh\'s game' });
-	// 	const commit6 = Commands.OpenGame({ playerToken: commit0.id, gameName: 'John\'s game' });
-	// 	await CommitStore.put(publisher1, `${CHANNEL}2`, commit0);
-	// 	await CommitStore.put(publisher1, `${CHANNEL}2`, Commands.RegisterPlayer({ playerName: 'john' }));
-	// 	await CommitStore.put(publisher1, `${CHANNEL}2`, commit1);
-	// 	await CommitStore.put(publisher1, `${CHANNEL}2`, commit2);
-	// 	await CommitStore.put(publisher1, `${CHANNEL}2`, Commands.PlayerLeave({ playerToken: commit1.id }));
-	// 	await CommitStore.put(publisher1, `${CHANNEL}2`, commit4);
-	// 	await CommitStore.put(publisher1, `${CHANNEL}2`, commit3);
-	// 	await CommitStore.put(publisher1, `${CHANNEL}2`, commit5);
-	// 	await CommitStore.put(publisher1, `${CHANNEL}2`, commit6);
-	// 	await new Promise((resolve) => setTimeout(() => resolve(), 300));
-
-	// 	console.log('HA0', lastPos);
-	// 	console.log('HA1', splayers);
-	// 	// console.log('HA2', sgames);
-	// 	console.log('HA3', serrors);
-
-	// 	expect(Object.values(splayers).map(p => p.name)).toEqual(['john', 'josh', 'jess']);
-
-	// 	expect(Object.values(sgames).map(g => g.name)).toEqual(['Josh\'s game', 'John\'s game']);
-
-	// 	expect(Object.values(serrors).map(e => e.message)).toEqual([
-	// 		'Player john already registered', 'Game Josh\'s game already exists'
-	// 	]);
-
-	// 	let tcard = null;
-	// 	for (let i = 0; i < 5; i ++) {
-	// 		const card = sgames[commit3.id].cards.pop();
-	// 		if (i === 4) tcard = card;
-	// 	}
-	// 	expect(tcard?.name).toEqual('Middle-East');
-	// });

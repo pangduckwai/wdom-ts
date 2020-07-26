@@ -1,4 +1,4 @@
-import { shuffleDeck, Territories, WildCards } from '../rules';
+import { _shuffle, Territories, WildCards } from '../rules';
 import {
 	BaseEvent, Commit, generateToken, PlayerRegistered, PlayerLeft,
 	GameOpened, GameClosed, GameJoined, GameQuitted, GameStarted,
@@ -46,7 +46,7 @@ export const Commands = {
 			type: 'GameOpened',
 			payload
 		}).build(),
-	CloseGame: (payload: { playerToken: string; gameToken: string }) =>
+	CloseGame: (payload: { playerToken: string }) =>
 		createCommit().addEvent<GameClosed>({
 			type: 'GameClosed',
 			payload
@@ -56,7 +56,7 @@ export const Commands = {
 			type: 'GameJoined',
 			payload
 		}).build(),
-	QuitGame: (payload: { playerToken: string; gameToken: string }) =>
+	QuitGame: (payload: { playerToken: string }) =>
 		createCommit().addEvent<GameQuitted>({
 			type: 'GameQuitted',
 			payload
@@ -66,25 +66,20 @@ export const Commands = {
 			type: 'GameStarted',
 			payload
 		});
-		for (const card of WildCards) { // Need to do it here because need to record each card in a event, otherwise cannot replay
+		for (const card of [...WildCards, ...Territories]) { // Need to do it here because need to record each card in a event, otherwise cannot replay
 			addEvent<CardReturned>({
 				type: 'CardReturned',
 				payload: { gameToken: payload.gameToken, cardName: card }
 			});
 		}
-		for (const card of Territories) { // Need to do it here because need to record each card in a event, otherwise cannot replay
-			addEvent<CardReturned>({
-				type: 'CardReturned',
-				payload: { gameToken: payload.gameToken, cardName: card }
+		for (const territoryName of _shuffle(Territories.map(t => t))) {
+			addEvent<TerritoryAssigned>({
+				type: 'TerritoryAssigned',
+				payload: { playerToken: payload.playerToken, territoryName }
 			});
 		}
 		return build();
 	},
-	AssignTerritory: (payload: { playerToken: string; gameToken: string; territoryName: string }) =>
-		createCommit().addEvent<TerritoryAssigned>({
-			type: 'TerritoryAssigned',
-			payload
-		}).build(),
 	SelectTerritory: (payload: { playerToken: string; gameToken: string; territoryName: string }) =>
 		createCommit().addEvent<TerritorySelected>({
 			type: 'TerritorySelected',

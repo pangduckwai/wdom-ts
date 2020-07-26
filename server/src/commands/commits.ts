@@ -64,6 +64,16 @@ else
   end
 end`;
 
+const get = `
+local idx = redis.call("hget", KEYS[2], ARGV[1])
+if idx then
+	local result = redis.call("zrange", KEYS[1], idx, idx, "WITHSCORES")
+	table.insert(result, 1, idx)
+	return result
+else
+	return nil
+end`;
+
 export const CommitStore = (client: Redis) => {
 	return {
 		put: (channel: string, commit: Commit): Promise<Commit> => {
@@ -96,11 +106,15 @@ export const CommitStore = (client: Redis) => {
 			return new Promise<Commit[]>(async (resolve, reject) => {
 				const { id, fromTime, toTime } = args ? args : { id: undefined, fromTime: undefined, toTime: undefined };
 				if (id) {
-					const idx = await client.hget(`${channel}:Commit:Idx`, id);
-					if (idx) {
-						const index = parseInt(idx, 10);
+					const result = await client.eval(get, 2, [
+						`${channel}:Commit`,
+						`${channel}:Commit:Idx`,
+						id
+					]);
+					if (result) {
+						const index = parseInt(result.shift(), 10);
 						try {
-							resolve(toCommits('[CommitStore]', await client.zrange(`${channel}:Commit`, index, index, 'WITHSCORES')));
+							resolve(toCommits('[CommitStore]', result));
 						} catch (error) {
 							reject(error);
 						}

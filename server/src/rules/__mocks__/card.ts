@@ -18,23 +18,26 @@ export interface Card {
 	type: CardTypes;
 };
 
-export const shuffleDeck = (): Card[] => {
-	const rand = [
-		37, 1, 36, 12, 15, 37, 37, 21, 21, 29, 13, 2, 9, 2, 7, 15, 13, 21, 15, 1, 7, 1, 1, 6,
-		0, 5, 8, 0, 5, 13, 12, 4, 2, 10, 3, 6, 0, 1, 2, 2, 0, 1, 0, 0
-	];
-	const cards = Object.values(buildDeck());
-	let size = cards.length;
-	let count = 0;
-
+const rand = [
+	37,  1, 36, 12, 15, 37, 37, 21, 21, 29, 13,  2,  9,  2,
+	 7, 15, 13, 21, 15,  1,  7,  1,  1,  6,	 0,  5,  8,  0,
+	 5, 13, 12,  4,  2, 10,  3,	 6,  0,  1,  2,  2,  0,  1,
+	 0,  0
+];
+export const shuffle = <K extends string, V>(source: Record<K, V>): V[] => {
+	return _shuffle(Object.values(source));
+};
+export const _shuffle = <T>(list: T[]): T[] => {
+	let size = list.length;
+	let cnt = rand.length - size;
+	if (cnt < 0) return list;
 	while (size > 0) {
-		const idx = rand[count ++]; // Math.floor(Math.random() * size);
-		const temp = cards[-- size];
-		cards[size] = cards[idx];
-		cards[idx] = temp;
+		const indx = rand[cnt ++]; // Math.floor(Math.random() * size);
+		const last = list[-- size];
+		list[size] = list[indx];
+		list[indx] = last;
 	}
-
-	return cards;
+	return list;
 };
 
 export const buildDeck = (): Record<WildCards | Territories, Card> => {

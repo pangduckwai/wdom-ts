@@ -13,11 +13,10 @@ type Mutation {
 	registerPlayer(playerName: String!): Response!
 	leaveGameRoom(playerToken: String!): Response!
 	openGame(playerToken: String!, gameName: String!): Response!
-	closeGame(playerToken: String!, gameToken: String!): Response!
+	closeGame(playerToken: String!): Response!
 	joinGame(playerToken: String!, gameToken: String!): Response!
-	quitGame(playerToken: String!, gameToken: String!): Response!
+	quitGame(playerToken: String!): Response!
 	startGame(playerToken: String!, gameToken: String!): Response!
-	assignTerritory(playerToken: String!, gameToken: String!, territoryName: String!): Response!
 	selectTerritory(playerToken: String!, gameToken: String!, territoryName: String!): Response!
 	attackTerritory(
 		playerToken: String!
@@ -105,8 +104,8 @@ export const resolvers = {
 			CommitStore(client).put(channel, Commands.OpenGame({ playerToken, gameName }))
 				.then(result => result)
 				.catch(error => new ApolloError(error)),
-		closeGame: async (_: any,{ playerToken, gameToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-			CommitStore(client).put(channel, Commands.CloseGame({ playerToken, gameToken }))
+		closeGame: async (_: any,{ playerToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
+			CommitStore(client).put(channel, Commands.CloseGame({ playerToken }))
 				.then(result => result)
 				.catch(error => new ApolloError(error)),
 		joinGame: async (
@@ -115,18 +114,12 @@ export const resolvers = {
 			CommitStore(client).put(channel, Commands.JoinGame({ playerToken, gameToken }))
 				.then(result => result)
 				.catch(error => new ApolloError(error)),
-		quitGame: async (_: any,{ playerToken, gameToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-			CommitStore(client).put(channel, Commands.QuitGame({ playerToken, gameToken }))
+		quitGame: async (_: any,{ playerToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
+			CommitStore(client).put(channel, Commands.QuitGame({ playerToken }))
 				.then(result => result)
 				.catch(error => new ApolloError(error)),
 		startGame: async (_: any,{ playerToken, gameToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
 			CommitStore(client).put(channel, Commands.StartGame({ playerToken, gameToken }))
-				.then(result => result)
-				.catch(error => new ApolloError(error)),
-		assignTerritory: async (
-			_: any, { playerToken, gameToken, territoryName }: any, { client, channel }: CommandContext
-		): Promise<Commit | Error> =>
-			CommitStore(client).put(channel, Commands.AssignTerritory({ playerToken, gameToken, territoryName }))
 				.then(result => result)
 				.catch(error => new ApolloError(error)),
 		selectTerritory: async (

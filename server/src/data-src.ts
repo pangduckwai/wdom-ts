@@ -38,7 +38,7 @@ export class EntityDS extends DataSource {
 								console.log(`[EntityDS.subscriber.on - message]: ${error}`);
 							} else {
 								const incomings = toCommits('[EntityDS.subscriber.on - message]', result);
-								const { players, games, messages } = reducer(deck)(incomings, { players: playerList, games: gameList });
+								const { players, games, messages } = reducer(map, deck)(incomings, { players: playerList, games: gameList });
 							}
 						}
 					);

@@ -32,7 +32,6 @@ export interface GameClosed extends BaseEvent {
 	readonly type: 'GameClosed';
 	payload: {
 		playerToken: string;
-		gameToken: string;
 	}
 }
 
@@ -48,7 +47,6 @@ export interface GameQuitted extends BaseEvent {
 	readonly type: 'GameQuitted';
 	payload: {
 		playerToken: string;
-		gameToken: string;
 	}
 }
 
@@ -67,7 +65,6 @@ export interface TerritoryAssigned extends BaseEvent {
 	readonly type: 'TerritoryAssigned';
 	payload: {
 		playerToken: string;
-		gameToken: string;
 		territoryName: string;
 	}
 }
