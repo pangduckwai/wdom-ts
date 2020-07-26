@@ -7,6 +7,7 @@
 		"build": "rimraf dist && tsc",
 		"clean": "rimraf dist",
 		"unit-test": "jest unit-test",
+		"commit-test": "jest commit-test",
 		"commands-test": "jest commands-test",
 		"reducer-test": "jest reducer-test",
 		"speed-test": "node ./dist/__tests__/speed-runs.js",

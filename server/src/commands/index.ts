@@ -4,8 +4,8 @@ import { Redis } from 'ioredis';
 export * from './events';
 export * from './commands';
 export * from './commits';
-export * from './schema';
-export * from './service';
+// export * from './schema';
+// export * from './service';
 
 export const generateToken = (timestamp: number) =>
 	crypto.createHash('sha256').update('' + (timestamp + Math.floor(Math.random()*10000))).digest('base64');
