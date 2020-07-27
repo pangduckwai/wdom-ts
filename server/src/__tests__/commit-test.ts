@@ -1,9 +1,12 @@
 require('dotenv').config();
 jest.mock('../rules/card');
 import RedisClient, { Redis } from 'ioredis';
-import { Commands, Commit, CommitStore, isNotification, toCommits } from '../commands';
+import { fromEventPattern, Observable, Subscription } from 'rxjs';
+import { debounceTime, filter } from 'rxjs/operators';
+import { Commands, Commit, CommitStore, isNotification, Notification, toCommits } from '../commands';
+import { Game, Message, Player, Subscriptions } from '../queries';
 import { buildContinents, buildDeck, buildMap, Card, Continents, _shuffle, shuffle, Territories, WildCards } from '../rules';
-import { CHANNEL, isEmpty } from '..';
+import { CHANNEL, deserialize, isEmpty } from '..';
 
 const host = process.env.REDIS_HOST;
 const port = (process.env.REDIS_PORT || 6379) as number;
@@ -11,7 +14,6 @@ const timestamp = Date.now();
 const map = buildMap();
 const deck = buildDeck();
 const cards = shuffle<WildCards | Territories, Card>(deck);
-const channel = `${CHANNEL}CMT`;
 const playerNames = ['pete', 'josh', 'saul', 'jess', 'bill', 'matt', 'nick', 'dick', 'dave', 'john', 'mike'];
 const gameHosts: Record<string, string[]> = {
 	'pete': ['jess'],
@@ -21,12 +23,13 @@ const gameHosts: Record<string, string[]> = {
 
 afterAll(async () => {
 	return new Promise((resolve) => setTimeout(() => {
-		console.log(`Unit test of channel ${channel} finished`);
+		console.log(`Unit test of channel ${CHANNEL} finished`);
 		resolve();
 	}, 1000));
 });
 
 describe('Registering player tests', () => {
+	const channel = `${CHANNEL}CMT`;
 	const mockInSubscriber = jest.fn();
 	const players: Record<string, Commit> = {};
 	const games: Record<string, Commit> = {};
@@ -113,18 +116,18 @@ describe('Registering player tests', () => {
 	it('player leave game', async () => {
 		subscribed = [];
 		for (const playerName of ['bill', 'dave']) {
-			const commit = await commitStore.put(channel, Commands.RegisterPlayer({ playerName: playerName }));
-			if (commit) delete players[playerName];
+			const commit = await commitStore.put(channel, Commands.PlayerLeave({ playerToken: players[playerName].id }));
+			// if (commit) delete players[playerName];
 		}
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
 
 		const result: string[] = [];
 		for (const msg of subscribed) {
 			for (const evt of msg.events) {
-				result.push(evt.payload.playerName);
+				result.push(evt.payload.playerToken);
 			}
 		}
-		expect(result).toEqual(['bill', 'dave']);
+		expect(result).toEqual([players['bill'].id, players['dave'].id]);
 	});
 
 	it('players open games', async () => {
@@ -177,6 +180,147 @@ describe('Registering player tests', () => {
 		const commit = await commitStore.put(channel, Commands.StartGame({ playerToken, gameToken }));
 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
 
-		console.log(JSON.stringify(subscribed, null, ' '));
+		// console.log(JSON.stringify(subscribed, null, ' '));
+	});
+});
+
+describe('rxjs tests', () => {
+	const channel = `${CHANNEL}Rx`;
+	const players: Record<string, Commit> = {};
+	let received: Notification[] = [];
+	let publisher: Redis;
+	let subscriber: Redis;
+	let commitStore: {
+		put: (channel: string, commit: Commit) => Promise<Commit>,
+		pub: (channel: string, commit: Commit) => Promise<Commit>,
+		get: (channel: string, args?: { id?: string; fromTime?: number; toTime?: number}) => Promise<{
+			index: number;
+			commit: Commit;
+		}[]>
+	};
+	let source$: Observable<any>;
+	let subscribe$: Subscription;
+
+	beforeAll(async () => {
+		publisher = new RedisClient({ host, port });
+		subscriber = new RedisClient({ host, port });
+		commitStore = CommitStore(publisher);
+
+		source$ = fromEventPattern(
+			handler => {
+				subscriber.on('message', (channel: string, message: string) => {
+					handler({ channel, message });
+				});
+				subscriber.subscribe(channel)
+					.then(x => console.log('Redis subscribed', x))
+					.catch(e => console.log(e));
+			},
+			_ => {
+				subscriber.unsubscribe(channel)
+					.then(x => console.log('Redis unsubscribed', x))
+					.catch(e => console.log(e));
+			}
+		);
+
+		subscribe$ = source$
+			.pipe(
+				debounceTime(100)
+			)
+			.subscribe({
+				next: event => {
+					received.push(deserialize('Commit Test', event.message, isNotification));
+					console.log(event);
+				},
+				error: error => console.log(error),
+				complete: () => console.log('complete!')
+			});
+	});
+
+	afterAll(async () => {
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		subscribe$.unsubscribe();
+		await subscriber.quit();
+		await publisher.quit();
+	});
+
+	it('test', async () => {
+		for (const playerName of playerNames) {
+			const commit = await commitStore.pub(channel, Commands.RegisterPlayer({ playerName: playerName }));
+			if (commit) players[playerName] = commit;
+		}
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		expect(received.length).toEqual(1);
+	});
+
+	it('player leave game', async () => {
+		for (const playerName of ['bill', 'dave']) {
+			const commit = await commitStore.pub(channel, Commands.PlayerLeave({ playerToken: players[playerName].id }));
+		}
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		expect(received.length).toEqual(2);
+	});
+});
+
+describe('subscriptions tests', () => {
+	const channel = `${CHANNEL}Scb`;
+	let publisher: Redis;
+	let subscriber: Redis;
+	let commitStore: {
+		put: (channel: string, commit: Commit) => Promise<Commit>,
+		pub: (channel: string, commit: Commit) => Promise<Commit>,
+		get: (channel: string, args?: { id?: string; fromTime?: number; toTime?: number}) => Promise<{
+			index: number;
+			commit: Commit;
+		}[]>
+	};
+	let subscriptions: {
+		start: (channel: string) => Promise<number>;
+		stop: (channel: string) => Promise<void>;
+		report: (channel: string) => Promise<{
+			ready: boolean;
+			players: Record<string, Player>;
+			games: Record<string, Game>;
+			messages: Message[];
+		}>;
+	};
+	let reports: {
+		ready: boolean;
+		players: Record<string, Player>;
+		games: Record<string, Game>;
+		messages: Message[];
+	};
+
+	beforeAll(async () => {
+		publisher = new RedisClient({ host, port });
+		subscriber = new RedisClient({ host, port });
+		commitStore = CommitStore(publisher);
+		subscriptions = Subscriptions(publisher, map, deck);
+
+		await subscriptions.start(channel)
+	});
+
+	afterAll(async () => {
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		subscriptions.stop(channel);
+		await subscriber.quit();
+		await publisher.quit();
+	});
+
+	it('subscriptions test - players registered', async () => {
+		for (const playerName of playerNames) {
+			const commit = await commitStore.pub(channel, Commands.RegisterPlayer({ playerName: playerName }));
+		}
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		reports = await subscriptions.report(channel);
+		expect(Object.values(reports.players).map(p => p.name).sort()).toEqual(playerNames.sort());
+	});
+
+	it('subscriptions test - players left', async () => {
+		for (const player of Object.values(reports.players).filter(p => p.name === 'bill' || p.name === 'dave')) {
+			await commitStore.pub(channel, Commands.PlayerLeave({ playerToken: player.token }));
+		}
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		reports = await subscriptions.report(channel);
+		expect(Object.values(reports.players).filter(p => p.status === 0).map(p => p.name).sort()).toEqual(['bill', 'dave']);
 	});
 });

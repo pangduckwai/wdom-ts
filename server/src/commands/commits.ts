@@ -1,4 +1,5 @@
 import { Redis } from 'ioredis';
+import { deserialize } from '..';
 import { BaseEvent } from '.';
 
 export interface Commit {
@@ -15,14 +16,6 @@ export const isCommit = (variable: any): variable is Commit => {
 		(val.events && (val.events.length > 0));
 };
 
-export const toCommit = (tag: string, str: string) => {
-	const result = JSON.parse(str);
-	if (isCommit(result))
-		return result as Commit;
-	else
-		throw new Error(`${tag} Unknown object type ${str}`);
-};
-
 export const toCommits = (tag: string, values: string[]) => {
 	if ((values.length % 2) !== 0) {
 		throw new Error(`${tag} Invalid format in incoming data`);
@@ -35,12 +28,25 @@ export const toCommits = (tag: string, values: string[]) => {
 			throw new Error(`${tag} Invalid format in index ${i} - ${values[i]}`);
 		}
 
-		const commit = toCommit(tag, values[i+1]);
+		const commit = deserialize(tag, values[i+1], isCommit);
 		results.push({index, commit});
 	}
 	return results;
 };
 
+/* NOTE HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+The following can calc number of digits needed,
+but useless in this case, because there is no way
+to determine the max value with clashed score, as
+this script is called individually
+	local count = 0
+	local value = ARGV[2]
+	repeat
+		value = value / 10
+		count = count + 1
+	until value < 1
+	return string.format('%0' .. count .. 'd', ARGV[1])
+*/
 // KEYS[1] - Publish channel
 // KEYS[2] - Commit
 // KEYS[3] - Commit index (id vs index)
@@ -63,19 +69,24 @@ if count > 0 then
 else
 	return redis.error_reply("[CommitStore] unknown error when writing commit (".. count .. ")")
 end`;
-/* NOTE HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-The following can calc number of digits needed,
-but useless in this case, because there is no way
-to determine the max value with clashed score, as
-this script is called individually
-	local count = 0
-	local value = ARGV[2]
-	repeat
-		value = value / 10
-		count = count + 1
-	until value < 1
-	return string.format('%0' .. count .. 'd', ARGV[1])
-*/
+
+// NOTE: Same as 'put' except:
+// ARGV[4] - Notification
+const pub = `
+local count = redis.call("rpush", KEYS[2], ARGV[1])
+if count > 0 then
+	local idx = count - 1
+	local r1 = redis.call("hset", KEYS[3], ARGV[2], idx)
+	local r2 = redis.call("zadd", KEYS[4], ARGV[3], string.format("%04d", idx))
+	if r1 >= 0 and r2 == 1 then
+		redis.call("publish", KEYS[1], ARGV[4])
+		return idx
+	else
+		return redis.error_reply("[CommitStore] error writing commit index (" .. r1 .. ", " .. r2 .. ")")
+	end
+else
+	return redis.error_reply("[CommitStore] unknown error when writing commit (".. count .. ")")
+end`;
 
 // KEYS[1] - Commit
 // KEYS[2] - Commit index (id vs index)
@@ -126,6 +137,29 @@ export const CommitStore = (client: Redis) => {
 						`${channel}:Commit:Idx`,
 						`${channel}:Commit:Time`,
 						JSON.stringify(commit), commit.id, timestamp
+					]);
+					if (result >= 0) {
+						resolve(commit);
+					} else {
+						reject(new Error(result));
+					}
+				} catch (error) {
+					reject(error);
+				}
+			});
+		},
+		pub: (channel: string, commit: Commit): Promise<Commit> => {
+			return new Promise<Commit>(async (resolve, reject) => {
+				const timestamp = Date.now();
+				try {
+					commit.timestamp = timestamp;
+					const result = await client.eval(pub, 4, [
+						channel,
+						`${channel}:Commit`,
+						`${channel}:Commit:Idx`,
+						`${channel}:Commit:Time`,
+						JSON.stringify(commit), commit.id, timestamp,
+						`{"id":"${commit.id}","timestamp":${timestamp}}`
 					]);
 					if (result >= 0) {
 						resolve(commit);

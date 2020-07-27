@@ -3,7 +3,7 @@ jest.mock('../rules/card');
 import crypto from 'crypto';
 import RedisClient, { Redis } from 'ioredis';
 import { Commands, Commit, CommitStore, isNotification, toCommits } from '../commands';
-import { Game, Player, PlayerSnapshot, reducer, GameSnapshot, MessageType, MessageSnapshot, Subscription, Status } from '../queries';
+import { Game, Player, PlayerSnapshot, reducer, GameSnapshot, MessageType, MessageSnapshot, Subscriptions, Status } from '../queries';
 import { buildContinents, buildDeck, buildMap, Card, Continents, _shuffle, shuffle, Territories, WildCards } from '../rules';
 import { CHANNEL, isEmpty } from '..';
 

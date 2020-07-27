@@ -6,10 +6,11 @@
 	"scripts": {
 		"build": "rimraf dist && tsc",
 		"clean": "rimraf dist",
-		"unit-test": "jest unit-test",
-		"commit-test": "jest commit-test",
 		"commands-test": "jest commands-test",
+		"commit-test": "jest commit-test",
 		"reducer-test": "jest reducer-test",
+		"subscribe-test": "jest subscribe-test",
+		"unit-test": "jest unit-test",
 		"speed-test": "node ./dist/__tests__/speed-runs.js",
 		"test": "jest",
 		"sim": "jest simulation",
@@ -40,6 +41,7 @@
 		"helmet": "^3.18.0",
 		"ioredis": "^4.17.3",
 		"nodemon": "^2.0.4",
+		"rxjs": "^6.6.0",
 		"subscriptions-transport-ws": "^0.9.16",
 		"typescript": "^3.9.6",
 		"utf-8-validate": "^5.0.2"

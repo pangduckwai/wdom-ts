@@ -4,7 +4,7 @@ export * from './games';
 export * from './players';
 export * from './messages';
 export * from './reducer';
-export * from './subscription';
+export * from './subscriptions';
 
 export const getToken = (input?: Game | Player | string) => {
   if (isGame(input) || isPlayer(input))
