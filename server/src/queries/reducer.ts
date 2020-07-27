@@ -28,7 +28,7 @@ export const reducer = (
 								reinforcement: 0,
 								status: Status.New,
 								cards: {},
-								sessionid: generateToken(Date.now())
+								sessionid: generateToken()
 							};
 						}
 						break;

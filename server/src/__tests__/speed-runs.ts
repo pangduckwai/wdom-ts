@@ -3,8 +3,8 @@ import crypto from 'crypto';
 import RedisClient, { Redis } from 'ioredis';
 import { CHANNEL } from '..';
 
-const generateToken = (timestamp: number) =>
-	crypto.createHash('sha256').update('' + (timestamp + Math.floor(Math.random()*10000))).digest('base64');
+const generateToken = () =>
+	crypto.createHash('sha256').update(crypto.randomBytes(16).toString('hex')).digest('base64');
 
 interface TestObj {
 	id: string;
@@ -59,7 +59,7 @@ const test_s = async () => {
 		const timestamp = Date.now();
 		if ((idx % INTV) === 0) details.push(`details ${idx}`);
 		const obj: TestObj = {
-			id: generateToken(timestamp),
+			id: generateToken(),
 			name: `object-s-${idx}`,
 			timestamp,
 			runs: idx + 1,
@@ -96,7 +96,7 @@ const test_c = async () => {
 		const timestamp = Date.now();
 		if ((idx % INTV) === 0) details.push(`details ${idx}`);
 		const obj: TestObj = {
-			id: generateToken(timestamp),
+			id: generateToken(),
 			name: `object-c-${idx}`,
 			timestamp,
 			runs: idx + 1,
@@ -170,7 +170,7 @@ const test_l = async () => {
 		const timestamp = Date.now();
 		if ((idx % INTV) === 0) details.push(`details ${idx}`);
 		const obj: TestObj = {
-			id: generateToken(timestamp),
+			id: generateToken(),
 			name: `object-l-${idx}`,
 			timestamp,
 			runs: idx + 1,

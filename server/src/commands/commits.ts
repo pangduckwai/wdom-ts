@@ -53,7 +53,7 @@ local count = redis.call("rpush", KEYS[2], ARGV[1])
 if count > 0 then
 	local idx = count - 1
 	local r1 = redis.call("hset", KEYS[3], ARGV[2], idx)
-	local r2 = redis.call("zadd", KEYS[4], ARGV[3], idx)
+	local r2 = redis.call("zadd", KEYS[4], ARGV[3], string.format("%04d", idx))
 	if r1 >= 0 and r2 == 1 then
 		redis.call("publish", KEYS[1], ARGV[1])
 		return idx
@@ -63,14 +63,18 @@ if count > 0 then
 else
 	return redis.error_reply("[CommitStore] unknown error when writing commit (".. count .. ")")
 end`;
-/* TODO HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-local count = 0
-local value = ARGV[2]
-repeat
-	value = value / 10
-	count = count + 1
-until value < 1
-return string.format('%0' .. count .. 'd', ARGV[1])
+/* NOTE HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+The following can calc number of digits needed,
+but useless in this case, because there is no way
+to determine the max value with clashed score, as
+this script is called individually
+	local count = 0
+	local value = ARGV[2]
+	repeat
+		value = value / 10
+		count = count + 1
+	until value < 1
+	return string.format('%0' .. count .. 'd', ARGV[1])
 */
 
 // KEYS[1] - Commit
@@ -100,7 +104,7 @@ const get2 = `
 local result = {}
 local indexes = redis.call("zrangebyscore", KEYS[2], ARGV[1], ARGV[2])
 for i = 1, #indexes do
-	local cmt = redis.call("lindex", KEYS[1], indexes[i])
+	local cmt = redis.call("lindex", KEYS[1], tonumber(indexes[i]))
 	if cmt then
 		table.insert(result, indexes[i])
 		table.insert(result, cmt)

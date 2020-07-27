@@ -9,7 +9,7 @@ import {
 
 const createCommit = () => {
 	const commit: Commit = {
-		id: generateToken(Date.now()),
+		id: generateToken(),
 		version: 0,
 		events: []
 	};
@@ -66,7 +66,7 @@ export const Commands = {
 			type: 'GameStarted',
 			payload
 		});
-		for (const card of [...WildCards, ...Territories]) { // Need to do it here because need to record each card in a event, otherwise cannot replay
+		for (const card of _shuffle([...WildCards, ...Territories])) { // Need to do it here because need to record each card in a event, otherwise cannot replay
 			addEvent<CardReturned>({
 				type: 'CardReturned',
 				payload: { gameToken: payload.gameToken, cardName: card }

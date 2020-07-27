@@ -7,8 +7,8 @@ export * from './commits';
 // export * from './schema';
 // export * from './service';
 
-export const generateToken = (timestamp: number) =>
-	crypto.createHash('sha256').update('' + (timestamp + Math.floor(Math.random()*10000))).digest('base64');
+export const generateToken = () =>
+	crypto.createHash('sha256').update(crypto.randomBytes(16).toString('hex')).digest('base64');
 
 export type CommandContext = {
 	client: Redis;

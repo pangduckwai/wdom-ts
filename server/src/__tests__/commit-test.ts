@@ -28,8 +28,9 @@ afterAll(async () => {
 
 describe('Registering player tests', () => {
 	const mockInSubscriber = jest.fn();
-	const commits: Record<string, Commit> = {};
-	const subscribed: Commit[] = [];
+	const players: Record<string, Commit> = {};
+	const games: Record<string, Commit> = {};
+	let subscribed: Commit[] = [];
 	let publisher: Redis;
 	let subscriber: Redis;
 	let commitStore: {
@@ -53,14 +54,7 @@ describe('Registering player tests', () => {
 		});
 
 		await subscriber.subscribe(channel);
-		// await new Promise((resolve) => setTimeout(() => resolve(), 100));
-
 		commitStore = CommitStore(publisher);
-		for (const playerName of playerNames) {
-			const commit = await commitStore.put(channel, Commands.RegisterPlayer({ playerName: playerName }));
-			if (commit) commits[playerName] = commit;
-		}
-		await new Promise((resolve) => setTimeout(() => resolve(), 100));
 	});
 
 	afterAll(async () => {
@@ -68,14 +62,20 @@ describe('Registering player tests', () => {
 		await publisher.quit();
 	});
 
-	it('subscription preserve commits order', () => {
+	it('subscription preserve commits order', async () => {
+		for (const playerName of playerNames) {
+			const commit = await commitStore.put(channel, Commands.RegisterPlayer({ playerName: playerName }));
+			if (commit) players[playerName] = commit;
+		}
+		await new Promise((resolve) => setTimeout(() => resolve(), 100));
+
 		const result: string[] = [];
 		for (const msg of subscribed) {
 			for (const evt of msg.events) {
 				result.push(evt.payload.playerName);
 			}
 		}
-		expect(result).toEqual(Object.keys(commits));
+		expect(result).toEqual(Object.keys(players));
 	});
 
 	it('subscription match inputs', async () => {
@@ -85,18 +85,17 @@ describe('Registering player tests', () => {
 				compare[evt.payload.playerName] = result;
 			}
 		}
-		expect(compare).toEqual(commits);
+		expect(compare).toEqual(players);
 	});
 
 	it('get commit by id match inputs', async () => {
-		const commit = await commitStore.get(channel, { id: commits['josh'].id });
+		const commit = await commitStore.get(channel, { id: players['josh'].id });
 		expect(commit.length).toEqual(1);
-		expect(commit[0].commit).toEqual(commits['josh']);
+		expect(commit[0].commit).toEqual(players['josh']);
 	});
 
 	it('subscription match reading from redis directly', async () => {
 		const results = await commitStore.get(channel);
-		console.log(JSON.stringify(results, null, ' '));
 		expect(results.map(r => r.commit)).toEqual(subscribed);
 	});
 
@@ -108,6 +107,76 @@ describe('Registering player tests', () => {
 				compare[evt.payload.playerName] = result.commit;
 			}
 		}
-		expect(compare).toEqual(commits);
+		expect(compare).toEqual(players);
+	});
+
+	it('player leave game', async () => {
+		subscribed = [];
+		for (const playerName of ['bill', 'dave']) {
+			const commit = await commitStore.put(channel, Commands.RegisterPlayer({ playerName: playerName }));
+			if (commit) delete players[playerName];
+		}
+		await new Promise((resolve) => setTimeout(() => resolve(), 100));
+
+		const result: string[] = [];
+		for (const msg of subscribed) {
+			for (const evt of msg.events) {
+				result.push(evt.payload.playerName);
+			}
+		}
+		expect(result).toEqual(['bill', 'dave']);
+	});
+
+	it('players open games', async () => {
+		subscribed = [];
+		for (const hostName of Object.keys(gameHosts)) {
+			const playerToken = players[hostName].id;
+			const gameName = `${hostName}'s game`;
+			const commit = await commitStore.put(channel, Commands.OpenGame({ playerToken, gameName }));
+			if (commit) games[hostName] = commit;
+		}
+		await new Promise((resolve) => setTimeout(() => resolve(), 100));
+
+		const result: string[] = [];
+		for (const msg of subscribed) {
+			for (const evt of msg.events) {
+				result.push(evt.payload.gameName);
+			}
+		}
+		expect(result).toEqual(Object.values(games).map(g => g.events[0].payload.gameName));
+	});
+
+	it('players join games', async () => {
+		subscribed = [];
+		for (const hostName of Object.keys(gameHosts)) {
+			for (const playerName of gameHosts[hostName]) {
+				const playerToken = players[playerName].id;
+				const gameToken = games[hostName].id;
+				const commit = await commitStore.put(channel, Commands.JoinGame({ playerToken, gameToken }));
+			}
+		}
+		await new Promise((resolve) => setTimeout(() => resolve(), 100));
+
+		const result: string[] = [];
+		for (const msg of subscribed) {
+			for (const evt of msg.events) {
+				result.push(Object.values(players).filter(p => p.id === msg.events[0].payload.playerToken)[0].events[0].payload.playerName);
+			}
+		}
+		const expected: string[] = [];
+		for (const gh of Object.values(gameHosts)) {
+			expected.push(...gh);
+		}
+		expect(expected).toEqual(result);
+	});
+
+	it('player start game', async () => {
+		subscribed = [];
+		const playerToken = players['saul'].id;
+		const gameToken = games['saul'].id;
+		const commit = await commitStore.put(channel, Commands.StartGame({ playerToken, gameToken }));
+		await new Promise((resolve) => setTimeout(() => resolve(), 100));
+
+		console.log(JSON.stringify(subscribed, null, ' '));
 	});
 });
