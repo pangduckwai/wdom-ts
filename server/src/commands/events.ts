@@ -61,6 +61,21 @@ export interface GameStarted extends BaseEvent {
 
 // ************************
 // *** Game play Events ***
+export interface SetupBegun extends BaseEvent {
+	readonly type: 'SetupBegun';
+	payload: {
+		gameToken: string;
+	}
+}
+
+export interface SetupFinished extends BaseEvent {
+	readonly type: 'SetupFinished';
+	payload: {
+		playerToken: string;
+		gameToken: string;
+	}
+}
+
 export interface TerritoryAssigned extends BaseEvent {
 	readonly type: 'TerritoryAssigned';
 	payload: {
@@ -160,14 +175,6 @@ export interface NextPlayer extends BaseEvent {
 	payload: {
 		fromPlayer: string;
 		toPlayer: string;
-		gameToken: string;
-	}
-}
-
-export interface SetupFinished extends BaseEvent {
-	readonly type: 'SetupFinished';
-	payload: {
-		playerToken: string;
 		gameToken: string;
 	}
 }

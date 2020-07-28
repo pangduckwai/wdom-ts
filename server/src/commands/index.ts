@@ -18,13 +18,13 @@ export type CommandContext = {
 
 export interface Notification {
 	id: string;
-	timestamp: number;
+	index: number;
 }
 
 export const isNotification = (variable: any): variable is Notification => {
 	const val = variable as Notification;
 	return (val.id !== undefined) &&
-		(val.timestamp !== undefined);
+		(val.index !== undefined);
 }
 
 // export type BaseCommands<T> = {

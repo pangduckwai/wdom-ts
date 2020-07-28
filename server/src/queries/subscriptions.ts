@@ -23,11 +23,7 @@ export const Subscriptions = (
 
 	const commitStore: {
 		put: (channel: string, commit: Commit) => Promise<Commit>,
-		pub: (channel: string, commit: Commit) => Promise<Commit>,
-		get: (channel: string, args?: { id?: string; fromTime?: number; toTime?: number}) => Promise<{
-			index: number;
-			commit: Commit;
-		}[]>
+		get: (channel: string, args?: { id?: string; from?: number; to?: number}) => Promise<Commit[]>
 	} = CommitStore(client);
 
 	return {
@@ -74,13 +70,13 @@ export const Subscriptions = (
 						.subscribe({
 							next: async event => {
 								const notification = deserialize('[Subscriptions]', event.message, isNotification);
-								const criteria: { fromTime?: number; toTime?: number } = { toTime: notification.timestamp };
+								const criteria: { from?: number; to?: number } = { to: notification.index };
 
-								if (subscribers[channel].lastPosition) criteria.fromTime = subscribers[channel].lastPosition;
+								if (subscribers[channel].lastPosition) criteria.from = subscribers[channel].lastPosition;
 								const incomings = await commitStore.get(event.channel, criteria);
-								subscribers[channel].lastPosition = notification.timestamp + 1;
+								subscribers[channel].lastPosition = notification.index + 1;
 
-								const { players, games, messages } = reducer(map, deck)(incomings.map(r => r.commit), {
+								const { players, games, messages } = reducer(map, deck)(incomings, {
 									players: subscribers[channel].players,
 									games: subscribers[channel].games
 								});

@@ -120,7 +120,7 @@ export const reducer = (
 						}
 						break;
 
-					case 'GameStarted':
+					case 'GameStarted': // Setup begun: round = 0, status = New
 						if (!players[event.payload.playerToken]) {
 							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
 						} else if (!games[event.payload.gameToken]) {
@@ -131,10 +131,27 @@ export const reducer = (
 							messages.push(buildMessage(commit.id, MessageType.Error, `Not enough players in the game ${games[event.payload.gameToken].name} yet`));
 						} else {
 							games[event.payload.gameToken].players = _shuffle(games[event.payload.gameToken].players);
-							games[event.payload.gameToken].round = 0; // status not equal Status.Ready yet, that is after setup finished
+							games[event.payload.gameToken].round = 0; // status not equal Status.Ready yet
 						}
 						break;
 
+					case 'SetupBegun': // Setup begun: round = 0, status = Ready
+						if (!games[event.payload.gameToken]) {
+							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+						} else if (games[event.payload.gameToken].round < 0) {
+							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
+						} else if (!games[event.payload.gameToken].cards) {
+							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
+						} else {
+							games[event.payload.gameToken].status = Status.Ready;
+							games[event.payload.gameToken].turns = 0; // First player start gaame setup
+						}
+						break;
+
+					case 'SetupFinished': // Setup begun: round = 1, status = Ready
+						// TODO
+						break;
+	
 					case 'TerritoryAssigned':
 						if (!games[event.payload.gameToken]) {
 							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
@@ -205,10 +222,6 @@ export const reducer = (
 						break;
 
 					case 'NextPlayer':
-						// TODO
-						break;
-
-					case 'SetupFinished':
 						// TODO
 						break;
 

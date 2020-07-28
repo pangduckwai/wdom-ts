@@ -2,9 +2,9 @@ import { _shuffle, Territories, WildCards } from '../rules';
 import {
 	BaseEvent, Commit, generateToken, PlayerRegistered, PlayerLeft,
 	GameOpened, GameClosed, GameJoined, GameQuitted, GameStarted,
-	TerritoryAssigned, TerritorySelected, TerritoryAttacked, TerritoryConquered,
-	TerritoryFortified, PlayerDefeated, TroopPlaced, NextPlayer,
-	SetupFinished, TurnEnded, CardReturned, CardsRedeemed, GameWon
+	SetupBegun, SetupFinished, TerritoryAssigned, TerritorySelected,
+	TerritoryAttacked, TerritoryConquered, TerritoryFortified, PlayerDefeated,
+	TroopPlaced, NextPlayer, TurnEnded, CardReturned, CardsRedeemed, GameWon
 } from '.';
 
 const createCommit = () => {
@@ -66,20 +66,29 @@ export const Commands = {
 			type: 'GameStarted',
 			payload
 		});
-		for (const card of _shuffle([...WildCards, ...Territories])) { // Need to do it here because need to record each card in a event, otherwise cannot replay
-			addEvent<CardReturned>({
-				type: 'CardReturned',
-				payload: { gameToken: payload.gameToken, cardName: card }
-			});
-		}
 		for (const territoryName of _shuffle(Territories.map(t => t))) {
 			addEvent<TerritoryAssigned>({
 				type: 'TerritoryAssigned',
 				payload: { gameToken: payload.gameToken, territoryName }
 			});
 		}
+		for (const card of _shuffle([...WildCards, ...Territories])) { // Need to do it here because need to record each card in a event, otherwise cannot replay
+			addEvent<CardReturned>({
+				type: 'CardReturned',
+				payload: { gameToken: payload.gameToken, cardName: card }
+			});
+		}
+		addEvent<SetupBegun>({
+			type: 'SetupBegun',
+			payload: { gameToken: payload.gameToken }
+		});
 		return build();
 	},
+	FinishSetup: (payload: { playerToken: string; gameToken: string }) =>
+		createCommit().addEvent<SetupFinished>({
+			type: 'SetupFinished',
+			payload
+		}).build(),
 	SelectTerritory: (payload: { playerToken: string; gameToken: string; territoryName: string }) =>
 		createCommit().addEvent<TerritorySelected>({
 			type: 'TerritorySelected',
@@ -134,11 +143,6 @@ export const Commands = {
 	NextPlayer: (payload: { fromPlayer: string; toPlayer: string; gameToken: string }) =>
 		createCommit().addEvent<NextPlayer>({
 			type: 'NextPlayer',
-			payload
-		}).build(),
-	FinishSetup: (payload: { playerToken: string; gameToken: string }) =>
-		createCommit().addEvent<SetupFinished>({
-			type: 'SetupFinished',
 			payload
 		}).build(),
 	EndTurn: (payload: { playerToken: string; gameToken: string }) =>
