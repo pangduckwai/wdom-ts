@@ -64,7 +64,8 @@ export interface GameStarted extends BaseEvent {
 export interface TerritoryAssigned extends BaseEvent {
 	readonly type: 'TerritoryAssigned';
 	payload: {
-		playerToken: string;
+		playerToken?: string;
+		gameToken: string;
 		territoryName: string;
 	}
 }

@@ -75,7 +75,7 @@ export const Commands = {
 		for (const territoryName of _shuffle(Territories.map(t => t))) {
 			addEvent<TerritoryAssigned>({
 				type: 'TerritoryAssigned',
-				payload: { playerToken: payload.playerToken, territoryName }
+				payload: { gameToken: payload.gameToken, territoryName }
 			});
 		}
 		return build();

@@ -1,16 +1,17 @@
 import { Redis } from 'ioredis';
 import { Card, Territories, WildCards } from '../rules';
 import { isEmpty } from '..';
-import { isPlayer, Player, Status } from '.';
+import { isPlayer, Status } from '.';
 
 export interface Game {
 	token: string;
 	name: string;
-	host: Player | string;
+	host: string;
 	round: number; // -1
 	redeemed: number; // 0
 	status: Status;
-	players: (Player | string)[]; // use array because use this to also remember the order of turns
+	players: string[]; // use array because use this to also remember the order of turns
+	turns: number;
 	cards?: Card[]; // the deck has to be shuffled, thus need array
 };
 
@@ -21,7 +22,9 @@ export const isGame = (variable: any): variable is Game => {
 		(val.host !== undefined) &&
 		(val.round !== undefined) &&
 		(val.redeemed !== undefined) &&
-		(val.status !== undefined);
+		(val.status !== undefined) &&
+		(val.players !== undefined) &&
+		(val.turns !== undefined);
 };
 
 // KEYS[1] - Player (by Token)
@@ -41,9 +44,9 @@ return rst`;
 
 // KEYS[1] - Game (by Token)
 // KEYS[2] - Game Index (by Name)
-// ARGV    - token, name, host, round, redeemed, status, cards?, players?
+// ARGV    - token, name, host, round, redeemed, status, turns, players?, cards?
 const put = `
-local idx = 9
+local idx = 10
 local rst = 0
 
 if redis.call("hset", KEYS[2], ARGV[4], ARGV[3]) >= 0 then
@@ -56,6 +59,7 @@ if redis.call("hset", KEYS[1], "host", ARGV[5]) >= 0 then rst = rst + 1 end
 if redis.call("hset", KEYS[1], "round", ARGV[6]) >= 0 then rst = rst + 1 end
 if redis.call("hset", KEYS[1], "redeemed", ARGV[7]) >= 0 then rst = rst + 1 end
 if redis.call("hset", KEYS[1], "status", ARGV[8]) >= 0 then rst = rst + 1 end
+if redis.call("hset", KEYS[1], "turns", ARGV[9]) >= 0 then rst = rst + 1 end
 
 if redis.call("hset", KEYS[1], "cardsCnt", ARGV[1]) >= 0 then
 	rst = rst + 1
@@ -114,11 +118,11 @@ export const GameSnapshot = (
 			});
 		},
 		put: (channel: string, {
-			token, name, host, round, redeemed, status, players, cards
+			token, name, host, round, redeemed, status, players, turns, cards
 		}: Game): Promise<number> => {
 			if (status === Status.Deleted) {
 				return GameSnapshot(client, deck).delete(channel, {
-					token, name, host, round, redeemed, status, players, cards
+					token, name, host, round, redeemed, status, players, turns, cards
 				});
 			} else {
 				return new Promise<number>(async (resolve, reject) => {
@@ -130,12 +134,12 @@ export const GameSnapshot = (
 						cnum, pnum,
 						token, name,
 						isPlayer(host) ? host.token : host,
-						round, redeemed, status
+						round, redeemed, status, turns
 					];
 					if (cards) args.push(...cards.map(c => c.name));
 					args.push(...players.map(p => isPlayer(p) ? p.name : p));
 
-					const expected = 9 + cnum + pnum;
+					const expected = 10 + cnum + pnum;
 					const result = await client.eval(put, 2, args);
 					if (result === expected)
 						resolve(result);
@@ -161,7 +165,8 @@ export const GameSnapshot = (
 							round: parseInt(result.round, 10),
 							redeemed: parseInt(result.redeemed, 10),
 							status: parseInt(result.status),
-							players: []
+							players: [],
+							turns: parseInt(result.turns, 10)
 						};
 
 						const cards: Card[] = [];

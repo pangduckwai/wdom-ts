@@ -1,7 +1,7 @@
 import { Redis } from 'ioredis';
 import { Card, Territory, Territories, WildCards } from '../rules';
 import { isEmpty } from '..';
-import { Game, isGame, Status } from '.';
+import { Status } from '.';
 
 export interface Player {
 	token: string;
@@ -9,7 +9,7 @@ export interface Player {
 	reinforcement: number; // 0
 	status: Status;
 	sessionid?: string;
-	joined?: Game | string;
+	joined?: string;
 	holdings?: Record<string, Territory>;
 	cards?: Record<string, Card>;
 };
@@ -137,7 +137,7 @@ export const PlayerSnapshot = (
 					}
 					if (joined){
 						args.push('joined');
-						args.push(isGame(joined) ? joined.token : joined);
+						args.push(joined);
 					}
 					if (holdings) args.push(...hold);
 					if (cards) args.push(...card);

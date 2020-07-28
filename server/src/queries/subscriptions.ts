@@ -91,39 +91,6 @@ export const Subscriptions = (
 							error: error => reject(error),
 							complete: () => console.log('complete!')
 						});
-					// subscribers[channel].subscriber.on('message', async (channel, message) => {
-					// 	try {
-					// 		subscribers[channel].busy = true;
-					// 		const notification = JSON.parse(message);
-					// 		if (isNotification(notification)) {
-					// 			if (!subscribers[channel].ready) {
-					// 				reject(new Error(`Subscription ${channel} not ready`));
-					// 			} else {
-					// 				const incomings = await CommitStore(client).get(channel, { id: notification.id });
-
-					// 				const { players, games, messages } = reducer(map, deck)(incomings, {
-					// 					players: subscribers[channel].players,
-					// 					games: subscribers[channel].games
-					// 				});
-					// 				subscribers[channel].players = players;
-					// 				subscribers[channel].games = games;
-					// 				subscribers[channel].messages.push(...messages);
-					// 				subscribers[channel].busy = false;
-					// 				// for (const player of Object.values(players)) {
-					// 				// 	PlayerSnapshot(client, map, deck).put(channel, player);
-					// 				// }
-					// 				// for (const game of Object.values(games)) {
-					// 				// 	GameSnapshot(client, deck).put(channel, game);
-					// 				// }
-					// 				// for (const message of messages) {
-					// 				// 	MessageSnapshot.put(client, channel, message);
-					// 				// }
-					// 			}
-					// 		}
-					// 	} catch (error) {
-					// 		reject(error);
-					// 	}
-					// });
 				}
 			});
 		},
