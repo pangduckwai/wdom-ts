@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import RedisClient, { Redis } from 'ioredis';
 import { Commands, Commit, CommitStore, isNotification, toCommits } from '../commands';
 import { Game, Player, PlayerSnapshot, reducer, GameSnapshot, MessageType, MessageSnapshot, Subscriptions, Status } from '../queries';
-import { buildContinents, buildDeck, buildMap, Card, Continents, _shuffle, shuffle, Territories, WildCards } from '../rules';
+import { buildWorld, buildDeck, buildMap, Card, Continents, _shuffle, shuffle, Territories, WildCards } from '../rules';
 import { CHANNEL, isEmpty } from '..';
 
 const host = process.env.REDIS_HOST;
@@ -54,21 +54,21 @@ describe('Programming behaviour tests', () => {
 	});
 
 	it('test cloning Record<K,T>', () => {
-		const con1 = buildContinents();
-		const con2 = buildContinents();
+		const con1 = buildWorld();
+		const con2 = buildWorld();
 		con1['Europe'].reinforcement = 9;
 		expect(con2['Europe'].reinforcement).toEqual(5);
 	});
 
 	it('test cloning Record<K,T> again', () => {
-		const con1 = buildContinents();
-		const con2 = buildContinents();
+		const con1 = buildWorld();
+		const con2 = buildWorld();
 		con1['Asia'].reinforcement = 3;
 		expect(con2['Asia'].reinforcement).toEqual(7);
 	});
 
 	it('test Continents initialized properly', () => {
-		const world = buildContinents();
+		const world = buildWorld();
 		let count = 0;
 		for (const item of Object.values(Continents)) {
 			if (item === world[item].name) count ++;
@@ -107,14 +107,15 @@ describe('Programming behaviour tests', () => {
 			name: 'Player One',
 			reinforcement: 0,
 			cards: {},
+			holdings: {},
 			status: Status.New
 		};
 		const list = shuffle<WildCards | Territories, Card>(deck);
 		for (let i = 0; i < 5; i ++) {
 			const card = list.pop();
-			if (card && player.cards) player.cards[card.name] = card;
+			if (card) player.cards[card.name] = card;
 		}
-		const type = (player.cards) ? player.cards['Middle-East'].type : 999;
+		const type = player.cards['Middle-East'].type;
 		expect(type).toEqual(1);
 	});
 
@@ -152,6 +153,33 @@ describe('Programming behaviour tests', () => {
 		console.log(`${buf.length} -- ${buf.toString('hex')}`);
 		const token = crypto.createHash('sha256').update(crypto.randomBytes(16).toString('hex')).digest('base64');
 		console.log(token);
+	});
+
+	it('test random number 2', () => {
+		const result: number[] = [];
+		for (let i = 0; i < 100; i++) {
+			const buf = parseInt(crypto.randomBytes(3).toString('hex'), 16);
+			result.push(buf);
+		}
+		console.log(`${result}`);
+	});
+
+	it('test random number 3', () => {
+		const max = (parseInt('ffffff', 16) + 1); // 16777216
+		// const onesixth = max / 6; // 8388608
+		console.log(max);
+		const result: number[] = [];
+		for (let i = 0; i < 100; i++) {
+			const buf = Math.floor(parseInt(crypto.randomBytes(3).toString('hex'), 16) * 6 / max) + 1;
+			result.push(buf);
+		}
+		console.log(`${result}`);
+	});
+
+	it('test array', () => {
+		const buf: string[] = [];
+		buf[4] = 'Hallo';
+		console.log(buf.length, buf[1], buf[4], buf);
 	});
 });
 

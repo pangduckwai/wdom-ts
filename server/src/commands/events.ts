@@ -71,7 +71,6 @@ export interface SetupBegun extends BaseEvent {
 export interface SetupFinished extends BaseEvent {
 	readonly type: 'SetupFinished';
 	payload: {
-		playerToken: string;
 		gameToken: string;
 	}
 }
@@ -85,6 +84,24 @@ export interface TerritoryAssigned extends BaseEvent {
 	}
 }
 
+export interface ReinforcementArrived extends BaseEvent {
+	readonly type: 'ReinforcementArrived';
+	payload: {
+		playerToken?: string;
+		gameToken: string;
+	}
+}
+
+export interface MoveMade extends BaseEvent {
+	readonly type: 'MoveMade';
+	payload: {
+		playerToken: string;
+		gameToken: string;
+		territoryName: string;
+		flag: number;
+	}
+}
+
 export interface TerritorySelected extends BaseEvent {
 	readonly type: 'TerritorySelected';
 	payload: {
@@ -94,10 +111,12 @@ export interface TerritorySelected extends BaseEvent {
 	}
 }
 
+/** fromPlayer is the attacker, toPlayer is the defender */
 export interface TerritoryAttacked extends BaseEvent {
 	readonly type: 'TerritoryAttacked';
 	payload: {
-		playerToken: string;
+		fromPlayer: string;
+		toPlayer: string;
 		gameToken: string;
 		fromTerritory: string;
 		toTerritory: string;
@@ -146,7 +165,7 @@ export interface TroopPlaced extends BaseEvent {
 		playerToken: string;
 		gameToken: string;
 		territoryName: string;
-		amount?: number;
+		amount: number;
 	}
 }
 
@@ -170,11 +189,9 @@ export interface TroopPlaced extends BaseEvent {
 // 	}
 // }
 
-export interface NextPlayer extends BaseEvent {
-	readonly type: 'NextPlayer';
+export interface TurnStarted extends BaseEvent {
+	readonly type: 'TurnStarted';
 	payload: {
-		fromPlayer: string;
-		toPlayer: string;
 		gameToken: string;
 	}
 }

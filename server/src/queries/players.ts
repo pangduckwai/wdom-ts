@@ -8,10 +8,10 @@ export interface Player {
 	name: string;
 	reinforcement: number; // 0
 	status: Status;
-	sessionid?: string;
+	holdings: Record<string, Territory>;
+	cards: Record<string, Card>;
 	joined?: string;
-	holdings?: Record<string, Territory>;
-	cards?: Record<string, Card>;
+	sessionid?: string;
 };
 
 export const isPlayer = (variable: any): variable is Player => {
@@ -123,8 +123,8 @@ export const PlayerSnapshot = (
 			} else {
 				return new Promise<number>(async (resolve, reject) => {
 					const base = 8 + (sessionid ? 2 : 0) + (joined ? 2 : 0);
-					const hold = holdings ? Object.keys(holdings) : [];
-					const card = cards ? Object.keys(cards) : [];
+					const hold = Object.keys(holdings);
+					const card = Object.keys(cards);
 					const args = [
 						`${channel}:Player:${token}`,
 						`${channel}:Player:Name`,
@@ -139,8 +139,8 @@ export const PlayerSnapshot = (
 						args.push('joined');
 						args.push(joined);
 					}
-					if (holdings) args.push(...hold);
-					if (cards) args.push(...card);
+					args.push(...hold);
+					args.push(...card);
 
 					const expected = (base/2) + hold.length + card.length + 3;
 					const result = await client.eval(put, 2, args);
@@ -164,21 +164,19 @@ export const PlayerSnapshot = (
 							name: result.name,
 							reinforcement: parseInt(result.reinforcement, 10),
 							status: parseInt(result.status, 10),
+							holdings: {},
+							cards: {}
 						};
 						if (result.sessionid) player.sessionid = result.sessionid;
 						if (result.joined) player.joined = result.joined;
 
-						const holdings: Record<string, Territory> = {};
 						for (let i = 1; i <= parseInt(result.holdingsCnt); i ++) {
-							holdings[result[`cards${i}`]] = map[result[`holdings${i}`] as Territories];
+							player.holdings[result[`cards${i}`]] = map[result[`holdings${i}`] as Territories];
 						}
-						if (Object.keys(holdings).length > 0) player.holdings = holdings;
 
-						const cards: Record<string, Card> = {};
 						for (let i = 1; i <= parseInt(result.cardsCnt); i ++) {
-							cards[result[`cards${i}`]] = deck[result[`cards${i}`] as Territories | WildCards];
+							player.cards[result[`cards${i}`]] = deck[result[`cards${i}`] as Territories | WildCards];
 						}
-						if (Object.keys(cards).length > 0) player.cards = cards;
 
 						resolve(player);
 					} else {

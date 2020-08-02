@@ -13,3 +13,7 @@ export const deserialize = <T>(tag: string, str: string, typeGuard: (x: any) => 
 	else
 		throw new Error(`${tag} Unknown object type ${str}`);
 };
+
+export const FLAG_SHIFT = 1; // 0001
+export const FLAG_ALT = 2;   // 0010
+export const FLAG_CTRL = 4;  // 0100

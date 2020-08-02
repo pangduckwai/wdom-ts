@@ -9,10 +9,11 @@ export interface Game {
 	host: string;
 	round: number; // -1
 	redeemed: number; // 0
+	turns: number;
 	status: Status;
 	players: string[]; // use array because use this to also remember the order of turns
-	turns: number;
-	cards?: Card[]; // the deck has to be shuffled, thus need array
+	selected: string[]; // Current territory
+	cards: Card[]; // the deck has to be shuffled, thus need array
 };
 
 export const isGame = (variable: any): variable is Game => {
@@ -118,11 +119,11 @@ export const GameSnapshot = (
 			});
 		},
 		put: (channel: string, {
-			token, name, host, round, redeemed, status, players, turns, cards
+			token, name, host, round, redeemed, turns, status, players, selected, cards
 		}: Game): Promise<number> => {
 			if (status === Status.Deleted) {
 				return GameSnapshot(client, deck).delete(channel, {
-					token, name, host, round, redeemed, status, players, turns, cards
+					token, name, host, round, redeemed, turns, status, players, selected, cards
 				});
 			} else {
 				return new Promise<number>(async (resolve, reject) => {
@@ -132,12 +133,12 @@ export const GameSnapshot = (
 						`${channel}:Game:${token}`,
 						`${channel}:Game:Name`,
 						cnum, pnum,
-						token, name,
-						isPlayer(host) ? host.token : host,
-						round, redeemed, status, turns
+						token, name, host,
+						round, redeemed,
+						status, turns
 					];
-					if (cards) args.push(...cards.map(c => c.name));
-					args.push(...players.map(p => isPlayer(p) ? p.name : p));
+					args.push(...cards.map(c => c.name));
+					args.push(...players);
 
 					const expected = 10 + cnum + pnum;
 					const result = await client.eval(put, 2, args);
@@ -164,16 +165,16 @@ export const GameSnapshot = (
 							host: result.host,
 							round: parseInt(result.round, 10),
 							redeemed: parseInt(result.redeemed, 10),
+							turns: parseInt(result.turns, 10),
 							status: parseInt(result.status),
 							players: [],
-							turns: parseInt(result.turns, 10)
+							selected: [],
+							cards: [],
 						};
 
-						const cards: Card[] = [];
 						for (let i = 1; i <= parseInt(result.cardsCnt); i ++) {
-							cards.push(deck[result[`cards${i}`] as Territories | WildCards]);
+							game.cards.push(deck[result[`cards${i}`] as Territories | WildCards]);
 						}
-						if (cards.length > 0) game.cards = cards;
 
 						for (let i = 1; i <= parseInt(result.playersCnt); i ++) {
 							game.players.push(result[`players${i}`]);
