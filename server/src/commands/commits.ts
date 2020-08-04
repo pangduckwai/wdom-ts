@@ -1,29 +1,5 @@
 import { Redis } from 'ioredis';
-import { deserialize } from '..';
-import { BaseEvent } from '.';
-
-export interface Commit {
-	id: string;
-	version: number;
-	events: BaseEvent[];
-	timestamp?: number;
-};
-
-export const isCommit = (variable: any): variable is Commit => {
-	const val = variable as Commit;
-	return (val.id !== undefined) &&
-		(val.version !== undefined) &&
-		(val.events && (val.events.length > 0));
-};
-
-export const toCommits = (tag: string, values: string[]) => {
-	const results: Commit[] = [];
-	for (const value of values) {
-		const commit = deserialize(tag, value, isCommit);
-		results.push(commit);
-	}
-	return results;
-};
+import { Commit, toCommits } from '..';
 
 /* NOTE HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 The following can calc number of digits needed,

@@ -1,34 +1,11 @@
 import { _shuffle, Territories, WildCards } from '../rules';
 import {
-	BaseEvent, Commit, generateToken, PlayerRegistered, PlayerLeft,
+	createCommit, PlayerRegistered, PlayerLeft,
 	GameOpened, GameClosed, GameJoined, GameQuitted, GameStarted,
-	SetupBegun, TerritoryAssigned, ReinforcementArrived, MoveMade,
-	TerritoryAttacked, TerritoryConquered, TerritoryFortified, PlayerDefeated,
+	SetupBegun, TerritoryAssigned, MoveMade,
+	TerritoryConquered, TerritoryFortified, TerritorySelected, PlayerDefeated,
 	TurnEnded, CardReturned, CardsRedeemed, GameWon
-} from '.';
-
-export const createCommit = () => {
-	const commit: Commit = {
-		id: generateToken(),
-		version: 0,
-		events: []
-	};
-
-	const build = (): Commit => {
-		if (commit.events.length < 1)  throw new Error('[createCommit] Invalid parameter(s)');
-		return commit;
-	}
-
-	const addEvent = <E extends BaseEvent>(event: E) => {
-		commit.events.push(event);
-		return {
-			build,
-			addEvent
-		};
-	}
-
-	return { addEvent };
-};
+} from '..';
 
 export const Commands = {
 	RegisterPlayer: (payload: { playerName: string }) =>
@@ -78,10 +55,10 @@ export const Commands = {
 				payload: { gameToken: payload.gameToken, cardName: card }
 			});
 		}
-		addEvent<ReinforcementArrived>({
-			type: 'ReinforcementArrived',
-			payload: { gameToken: payload.gameToken }
-		});
+		// addEvent<ReinforcementArrived>({
+		// 	type: 'ReinforcementArrived',
+		// 	payload: { gameToken: payload.gameToken }
+		// });
 		addEvent<SetupBegun>({
 			type: 'SetupBegun',
 			payload: { gameToken: payload.gameToken }
@@ -97,6 +74,13 @@ export const Commands = {
 		createCommit().addEvent<MoveMade>({
 			type: 'MoveMade',
 			payload
+		}).addEvent<TerritorySelected>({
+			type: 'TerritorySelected',
+			payload: {
+				playerToken: payload.playerToken,
+				gameToken: payload.gameToken,
+				territoryName: payload.territoryName
+			}
 		}).build(),
 	// AttackTerritory: (payload: {
 	// 	playerToken: string;
@@ -110,22 +94,21 @@ export const Commands = {
 	// 		type: 'TerritoryAttacked',
 	// 		payload
 	// 	}).build(),
-	ConquerTerritory: (payload: {
-		fromPlayer: string;
-		toPlayer: string;
-		gameToken: string;
-		fromTerritory: string;
-		toTerritory: string;
-	}) =>
-		createCommit().addEvent<TerritoryConquered>({
-			type: 'TerritoryConquered',
-			payload
-		}).build(),
+	// ConquerTerritory: (payload: {
+	// 	fromPlayer: string;
+	// 	toPlayer: string;
+	// 	gameToken: string;
+	// 	fromTerritory: string;
+	// 	toTerritory: string;
+	// }) =>
+	// 	createCommit().addEvent<TerritoryConquered>({
+	// 		type: 'TerritoryConquered',
+	// 		payload
+	// 	}).build(),
 	Fortify: (payload: {
 		playerToken: string;
 		gameToken: string;
-		fromTerritory: string;
-		toTerritory: string;
+		territoryName: string;
 		amount: number;
 	}) =>
 		createCommit().addEvent<TerritoryFortified>({

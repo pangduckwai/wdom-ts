@@ -8,7 +8,7 @@ export enum MessageType {
 export interface Message {
 	commitId: string;
 	type: MessageType;
-	name?: string;
+	eventName: string;
 	message: string;
 	timestamp?: number;
 };
@@ -23,13 +23,12 @@ export const isMessage = (variable: any): variable is Message => {
 export const buildMessage = (
 	commitId: string,
 	type: MessageType,
+	eventName: string,
 	message: string,
-	name?: string,
 ): Message => {
 	const result: Message = {
-		commitId, type, message
+		commitId, type, eventName, message
 	};
-	if (name) result.name = name;
 	return result;
 }
 

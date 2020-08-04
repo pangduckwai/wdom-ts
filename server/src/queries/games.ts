@@ -1,7 +1,7 @@
 import { Redis } from 'ioredis';
 import { Card, Territories, WildCards } from '../rules';
 import { isEmpty } from '..';
-import { isPlayer, Status } from '.';
+import { Status } from '.';
 
 export interface Game {
 	token: string;
@@ -12,7 +12,6 @@ export interface Game {
 	turns: number;
 	status: Status;
 	players: string[]; // use array because use this to also remember the order of turns
-	selected: string[]; // Current territory
 	cards: Card[]; // the deck has to be shuffled, thus need array
 };
 
@@ -119,11 +118,11 @@ export const GameSnapshot = (
 			});
 		},
 		put: (channel: string, {
-			token, name, host, round, redeemed, turns, status, players, selected, cards
+			token, name, host, round, redeemed, turns, status, players, cards
 		}: Game): Promise<number> => {
 			if (status === Status.Deleted) {
 				return GameSnapshot(client, deck).delete(channel, {
-					token, name, host, round, redeemed, turns, status, players, selected, cards
+					token, name, host, round, redeemed, turns, status, players, cards
 				});
 			} else {
 				return new Promise<number>(async (resolve, reject) => {
@@ -168,7 +167,6 @@ export const GameSnapshot = (
 							turns: parseInt(result.turns, 10),
 							status: parseInt(result.status),
 							players: [],
-							selected: [],
 							cards: [],
 						};
 

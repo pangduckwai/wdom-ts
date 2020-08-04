@@ -1,10 +1,10 @@
 import { Redis } from 'ioredis';
 import { fromEventPattern, Observable, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
-import { deserialize } from '..';
-import { Commit, isNotification, toCommits, CommitStore } from '../commands';
+import { CommitStore } from '../commands';
 import { Card, Continent, Continents, Territory, Territories, WildCards } from '../rules';
-import { Game, GameSnapshot, Message, MessageSnapshot, Player, PlayerSnapshot, reducer } from '.';
+import { Commit, deserialize, isNotification } from '..';
+import { Game, Message, Player, reducer } from '.';
 
 export const Subscriptions = (
 	client: Redis,
@@ -36,8 +36,8 @@ export const Subscriptions = (
 					subscribers[channel] = {
 						ready: false,
 						subscriber: client.duplicate(),
-						players: await PlayerSnapshot(client, map, deck).list(channel),
-						games: await GameSnapshot(client, deck).list(channel),
+						players: {},
+						games: {},
 						messages: []
 					};
 
@@ -75,6 +75,9 @@ export const Subscriptions = (
 
 								if (subscribers[channel].lastPosition) criteria.from = subscribers[channel].lastPosition;
 								const incomings = await commitStore.get(event.channel, criteria);
+								if (incomings.length > 1) {
+									console.log("HEREHEREHERE", event.message, subscribers[channel].lastPosition, notification.index); // TODO TEMP
+								}
 								subscribers[channel].lastPosition = notification.index + 1;
 
 								let depth = 10; // prevent infinite loop

@@ -7,8 +7,10 @@ export interface Player {
 	token: string;
 	name: string;
 	reinforcement: number; // 0
+	selected: string; // ''
 	status: Status;
 	holdings: Record<string, Territory>;
+	holdingsCount: number; // 0
 	cards: Record<string, Card>;
 	joined?: string;
 	sessionid?: string;
@@ -114,11 +116,11 @@ export const PlayerSnapshot = (
 			});
 		},
 		put: (channel: string, {
-			token, name, reinforcement, status, sessionid, joined, holdings, cards
+			token, name, reinforcement, selected, status, sessionid, joined, holdings, holdingsCount, cards
 		}: Player): Promise<number> => {
 			if (status === Status.Deleted) {
 				return PlayerSnapshot(client, map, deck).delete(channel, {
-					token, name, reinforcement, status, sessionid, joined, holdings, cards
+					token, name, reinforcement, selected, status, sessionid, joined, holdings, holdingsCount, cards
 				});
 			} else {
 				return new Promise<number>(async (resolve, reject) => {
@@ -163,8 +165,10 @@ export const PlayerSnapshot = (
 							token: result.token,
 							name: result.name,
 							reinforcement: parseInt(result.reinforcement, 10),
+							selected: '',
 							status: parseInt(result.status, 10),
 							holdings: {},
+							holdingsCount: 0,
 							cards: {}
 						};
 						if (result.sessionid) player.sessionid = result.sessionid;

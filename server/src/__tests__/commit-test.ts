@@ -4,10 +4,10 @@ jest.mock('../rules/rules');
 import RedisClient, { Redis } from 'ioredis';
 import { fromEventPattern, Observable, Subscription } from 'rxjs';
 import { debounceTime, filter } from 'rxjs/operators';
-import { Commands, Commit, CommitStore, isNotification, Notification, toCommits } from '../commands';
+import { Commands, CommitStore } from '../commands';
 import { Game, Message, Player, Subscriptions } from '../queries';
 import { buildDeck, buildMap, buildWorld, Card, rules, _shuffle, shuffle, Territories, WildCards } from '../rules';
-import { CHANNEL, deserialize, isEmpty } from '..';
+import { CHANNEL, Commit, deserialize, isEmpty, isNotification, Notification, toCommits } from '..';
 
 const output = (
 reports: {
@@ -24,12 +24,17 @@ hostName: string) => {
 `* "${g.name}" [status: ${g.status}] [round: ${g.round}] [turn: ${g.turns}] [redeemed: ${g.redeemed}]
  Members:${g.players.map(k => {
 	const p = reports.players[k];
-	return `\n ${k === x ? '*' : '-' } "${p.name}" [status: ${p.status}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"] [selected: ${p.joined ? reports.games[p.joined].selected[reports.games[p.joined].players.findIndex(p => p === k)] : '-'}]
+	return `\n ${k === x ? '*' : '-' } "${p.name}" [status: ${p.status}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"] [selected: ${reports.players[k].selected}]
 ....holdings:${Object.values(p.holdings).map(t => ` ${t.name}[${t.troop}]`)}
 ....cards   :${Object.values(p.cards).map(c => `${c.name}(${c.type})`)}`;
 })}`;
 	console.log(output.replace(/[.][.][.][.]/gi, '  '));
-	if (reports.messages.length > 0) console.log(reports.messages[reports.messages.length - 1])
+
+	let message = '';
+	for (let i = ((reports.messages.length - 5) > 0 ? reports.messages.length - 5 : 0); i < reports.messages.length; i ++) {
+		message += `${reports.messages[i].commitId} ${reports.messages[i].type} ${reports.messages[i].eventName} ${reports.messages[i].message}\n`;
+	}
+	if (reports.messages.length > 0) console.log(message);
 };
 
 const host = process.env.REDIS_HOST;
@@ -592,6 +597,17 @@ describe('Subscriptions tests', () => {
 		expect(reports.players[playerToken].holdings['South-Africa'].troop).toEqual(9);
 	});
 
+	// North-Africa
+	it('player attack a non-adjacent territory owned by another player', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'nick')[0].token;
+		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+		await commitStore.put(channel, Commands.MakeMove({ playerToken, gameToken, territoryName: 'Egypt', flag: 1 }));
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		reports = await subscriptions.report(channel);
+		expect(reports.messages.filter(m => m.message === 'Territories not connected').length).toEqual(1);
+	});
+
 	it('player attack a territory', async () => {
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'nick')[0].token;
 		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
@@ -602,4 +618,37 @@ describe('Subscriptions tests', () => {
 		expect(reports.players[playerToken].holdings['Congo']).toBeDefined();
 	});
 
+	it('player fortified a territory', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'nick')[0].token;
+		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+		await commitStore.put(channel, Commands.Fortify({ playerToken, gameToken, territoryName: 'North-Africa', amount: 7 }));
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		reports = await subscriptions.report(channel);
+		expect(reports.games[gameToken].turns).toEqual(1);
+	});
+
+	it('Next player makes moves', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'mike')[0].token;
+		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+		await commitStore.put(channel, Commands.MakeMove({ playerToken, gameToken, territoryName: 'Argentina', flag: 1 }));
+		await commitStore.put(channel, Commands.MakeMove({ playerToken, gameToken, territoryName: 'Brazil', flag: 0 }));
+		await commitStore.put(channel, Commands.MakeMove({ playerToken, gameToken, territoryName: 'Brazil', flag: 0 }));
+		await commitStore.put(channel, Commands.MakeMove({ playerToken, gameToken, territoryName: 'Brazil', flag: 0 }));
+		await commitStore.put(channel, Commands.MakeMove({ playerToken, gameToken, territoryName: 'Brazil', flag: 0 }));
+		await commitStore.put(channel, Commands.MakeMove({ playerToken, gameToken, territoryName: 'Brazil', flag: 0 }));
+		await new Promise((resolve) => setTimeout(() => resolve(), 200));
+		reports = await subscriptions.report(channel);
+	});
+
+	// it('player end a turn', async () => {
+	// 	const playerToken = Object.values(reports.players).filter(p => p.name === 'mike')[0].token;
+	// 	const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+	// 	const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+	// 	await commitStore.put(channel, Commands.EndTurn({ playerToken, gameToken }));
+	// 	await new Promise((resolve) => setTimeout(() => resolve(), 200));
+	// 	reports = await subscriptions.report(channel);
+	// 	expect(reports.games[gameToken].turns).toEqual(2);
+	// })
 });

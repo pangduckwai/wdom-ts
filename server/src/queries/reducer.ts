@@ -1,10 +1,55 @@
 import { FLAG_SHIFT, FLAG_ALT } from '..';
 import {
-	Commit, createCommit, generateToken, ReinforcementArrived, SetupFinished,
-	TerritoryAttacked, TerritoryConquered, TerritorySelected, TroopPlaced, TurnStarted
-} from '../commands';
+	Commit, createCommit, generateToken,
+	TerritoryAttacked, TerritoryConquered, TurnEnded
+} from '..';
 import { Card, rules, _shuffle, Territories, WildCards, Territory, Continents, Continent } from '../rules';
 import { buildMessage, Game, Message, MessageType, Player, Status } from '.';
+
+const turnStarted = (
+	world: Record<Continents, Continent>,
+	players: Record<string, Player>,
+	games: Record<string, Game>,
+	gameToken: string
+) => {
+	const playerToken = games[gameToken].players[games[gameToken].turns];
+	players[playerToken].holdingsCount = Object.keys(players[playerToken].holdings).length;
+
+	// ReinforcementArrived
+	players[playerToken].reinforcement =
+		rules.basicReinforcement(players[playerToken].holdings) +
+		rules.continentReinforcement(world, players[playerToken].holdings);
+};
+
+const troopPlaced = (
+	world: Record<Continents, Continent>,
+	players: Record<string, Player>,
+	games: Record<string, Game>,
+	playerToken: string,
+	gameToken: string,
+	territoryName: string,
+	amount: number
+) => {
+	if (amount !== 0) {
+		// Both setup phase and game-play phase
+		players[playerToken].holdings[territoryName].troop += amount;
+		players[playerToken].reinforcement -= amount;
+	}
+	if ((games[gameToken].round === 0) && (amount >= 0)) {
+		// Setup phase
+		// If player remove a troop from a territory, stay in that player's turn
+		games[gameToken].turns ++;
+		if (games[gameToken].turns >= games[gameToken].players.length)
+			games[gameToken].turns = 0;
+
+		if (games[gameToken].players.filter(k => players[k].reinforcement > 0).length <= 0) {
+			// SetupFinished
+			games[gameToken].turns = 0;
+			games[gameToken].round = 1;
+			turnStarted(world, players, games, gameToken);
+		}
+	}
+};
 
 export const reducer = (
 	world: Record<Continents, Continent>,
@@ -26,15 +71,17 @@ export const reducer = (
 				switch (event.type) {
 					case 'PlayerRegistered':
 						if (Object.values(players).filter(player => player.name === event.payload.playerName).length > 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerName} already registered`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerName} already registered`));
 						} else {
 							players[commit.id] = {
 								token: commit.id,
 								name: event.payload.playerName,
+								selected: '',
 								reinforcement: 0,
 								status: Status.New,
-								cards: {},
 								holdings: {},
+								holdingsCount: 0,
+								cards: {},
 								sessionid: generateToken()
 							};
 						}
@@ -42,9 +89,9 @@ export const reducer = (
 
 					case 'PlayerLeft':
 						if (!players[event.payload.playerToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
 						} else if (players[event.payload.playerToken].joined) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Please quit any current game before leaving`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Please quit any current game before leaving`));
 						} else {
 							players[event.payload.playerToken].status = Status.Deleted;
 						}
@@ -52,13 +99,13 @@ export const reducer = (
 
 					case 'GameOpened':
 						if (!players[event.payload.playerToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
 						} else if (Object.values(games).filter(game => game.name === event.payload.gameName).length > 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameName} already exists`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameName} already exists`));
 						} else {
 							const joined = players[event.payload.playerToken].joined;
 							if (joined) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `You already in the game ${games[joined].name} and cannot open a new one`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You already in the game ${games[joined].name} and cannot open a new one`));
 							} else {
 								games[commit.id] = {
 									token: commit.id,
@@ -69,7 +116,6 @@ export const reducer = (
 									turns: 0,
 									status: Status.New,
 									players: [event.payload.playerToken],
-									selected: [],
 									cards: []
 								};
 								players[event.payload.playerToken].joined = commit.id;
@@ -79,13 +125,13 @@ export const reducer = (
 
 					case 'GameClosed':
 						if (!players[event.payload.playerToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
 						} else {
 							const game = Object.values(games).filter(game => game.host === event.payload.playerToken);
 							if (game.length <= 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `Player ${players[event.payload.playerToken].name} is not hosting any game`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${players[event.payload.playerToken].name} is not hosting any game`));
 							} else if (game.length > 1) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `Player ${players[event.payload.playerToken].name} is hosting more than one game`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${players[event.payload.playerToken].name} is hosting more than one game`));
 							} else {
 								games[game[0].token].status = Status.Deleted;
 								for (const player of Object.values(players).filter(player => player.joined && (player.joined === game[0].token))) {
@@ -97,17 +143,17 @@ export const reducer = (
 
 					case 'GameJoined':
 						if (!players[event.payload.playerToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
 						} else if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
 						} else if (games[event.payload.gameToken].host === event.payload.playerToken) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Cannot join your own game`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Cannot join your own game`));
 						} else if (games[event.payload.gameToken].round >= 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} already started`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} already started`));
 						} else if (players[event.payload.playerToken].joined) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `You already joined ${players[event.payload.playerToken].joined}`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You already joined ${players[event.payload.playerToken].joined}`));
 						} else if (Object.values(players).filter(player => player.joined === event.payload.gameToken).length >= rules.MaxPlayerPerGame) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} already full`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} already full`));
 						} else {
 							players[event.payload.playerToken].joined = event.payload.gameToken;
 							games[event.payload.gameToken].players.push(event.payload.playerToken);
@@ -116,85 +162,85 @@ export const reducer = (
 
 					case 'GameQuitted':
 						if (!players[event.payload.playerToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
 						} else {
 							const joinedToken = players[event.payload.playerToken].joined;
 							if (!joinedToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `You are not in any game currently`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not in any game currently`));
 							} else if (games[joinedToken].host === event.payload.playerToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `You cannot quit your own game`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You cannot quit your own game`));
 							} else {
 								players[event.payload.playerToken].joined = undefined;
 								games[joinedToken].players = games[joinedToken].players.filter(p => p !== event.payload.playerToken);
-								// TODO remove quitted player's 'selected' entry as well
 							}
 						}
 						break;
 
 					case 'GameStarted': // Setup begun: round = 0, status = New
 						if (!players[event.payload.playerToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
 						} else if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
 						} else if (games[event.payload.gameToken].host !== event.payload.playerToken) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `You can only start your own game`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You can only start your own game`));
 						} else if (games[event.payload.gameToken].players.length < rules.MinPlayerPerGame) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Not enough players in the game ${games[event.payload.gameToken].name} yet`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Not enough players in the game ${games[event.payload.gameToken].name} yet`));
 						} else {
 							games[event.payload.gameToken].players = _shuffle(games[event.payload.gameToken].players);
 							games[event.payload.gameToken].round = 0; // status not equal Status.Ready yet
+
+							// ReinforcementArrived
+							const playerLen = games[event.payload.gameToken].players.length;
+							for (const p of games[event.payload.gameToken].players) {
+								players[p].reinforcement = rules.initialTroops(playerLen) - Object.keys(players[p].holdings).length;
+							}
 						}
 						break;
 
 					case 'SetupBegun': // Setup begun: round = 0, status = Ready
 						if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
 						} else if (games[event.payload.gameToken].round < 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not yet started`));
 						} else if (games[event.payload.gameToken].cards.length <= 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not ready`));
 						} else {
 							games[event.payload.gameToken].status = Status.Ready;
 							games[event.payload.gameToken].turns = 0; // First player start gaame setup
 						}
 						break;
 
-					case 'SetupFinished': // Setup begun: round = 1, status = Ready
-						if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
-						} else if (games[event.payload.gameToken].round < 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
-						} else if (games[event.payload.gameToken].status !== Status.Ready) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
-						} else if (games[event.payload.gameToken].players.filter(k => players[k].reinforcement > 0).length > 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Reinforcement remaining, setup not yet finish`));
-						} else {
-							games[event.payload.gameToken].turns = 0;
-							games[event.payload.gameToken].round = 1;
-							commits.push(
-								createCommit().addEvent<TurnStarted>({
-									type: 'TurnStarted',
-									payload: { gameToken: event.payload.gameToken }
-								}).build()
-							);
-						}
-						break;
+					// case 'SetupFinished': // Setup begun: round = 1, status = Ready
+					// 	if (!games[event.payload.gameToken]) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
+					// 	} else if (games[event.payload.gameToken].round < 0) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not yet started`));
+					// 	} else if (games[event.payload.gameToken].status !== Status.Ready) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not ready`));
+					// 	} else if (games[event.payload.gameToken].players.filter(k => players[k].reinforcement > 0).length > 0) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Reinforcement remaining, setup not yet finish`));
+					// 	} else {
+					// 		games[event.payload.gameToken].turns = 0;
+					// 		games[event.payload.gameToken].round = 1;
+					// 		turnStarted(world, players, games, event.payload.gameToken);
+					// 	}
+					// 	break;
 	
 					case 'TerritoryAssigned':
 						if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
 						} else if (games[event.payload.gameToken].round < 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not yet started`));
 						} else if (!map[event.payload.territoryName as Territories]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Unknown territory ${event.payload.territoryName}`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Unknown territory ${event.payload.territoryName}`));
 						} else if (event.payload.playerToken) {
 							// Territory assigned during game play
 							if (!players[event.payload.playerToken]) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
 							} else if (games[event.payload.gameToken].status !== Status.Ready) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not ready`));
 							} else if (!players[event.payload.playerToken].joined) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `You are not in any game currently`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not in any game currently`));
 							} else {
 								const player = players[event.payload.playerToken];
 								const territory = map[event.payload.territoryName as Territories];
@@ -217,39 +263,6 @@ export const reducer = (
 						}
 						break;
 
-					case 'ReinforcementArrived':
-						if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
-						} else if (event.payload.playerToken) {
-							// Assign reinforcement to players during start of turns
-							if (!players[event.payload.playerToken]) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
-							} else if (games[event.payload.gameToken].round <= 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
-							} else if (games[event.payload.gameToken].status !== Status.Ready) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
-							} else if (games[event.payload.gameToken].players[games[event.payload.gameToken].turns] !== event.payload.playerToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `This is not yet your turn`));
-							} else if (!players[event.payload.playerToken].joined) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `You are not in any game currently`));
-							} else {
-								players[event.payload.playerToken].reinforcement =
-									rules.basicReinforcement(players[event.payload.playerToken].holdings) +
-									rules.continentReinforcement(world, players[event.payload.playerToken].holdings);
-							}
-						} else {
-							// Assign reinforcement to players during game setup
-							if (games[event.payload.gameToken].round < 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
-							} else {
-								const playerLen = games[event.payload.gameToken].players.length;
-								for (const p of games[event.payload.gameToken].players) {
-									players[p].reinforcement = rules.initialTroops(playerLen) - Object.keys(players[p].holdings).length;
-								}
-							}
-						}
-						break;
-
 					case 'MoveMade':
 						// This is the event when a player click on the map, which depends on situation, will
 						// generate specific events, such as attack, add troops, etc.
@@ -261,37 +274,33 @@ export const reducer = (
 						// NOTE!!! Also note that these secondary commits are not recorded (not written to Redis). However this
 						//    is okay for replays because these commits came be fully deduced by the primary ones
 						if (!players[event.payload.playerToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
 						} else if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
 						} else if (!map[event.payload.territoryName as Territories]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Unknown territory ${event.payload.territoryName}`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Unknown territory ${event.payload.territoryName}`));
 						} else if (games[event.payload.gameToken].status !== Status.Ready) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not ready`));
 						} else if (games[event.payload.gameToken].players[games[event.payload.gameToken].turns] !== event.payload.playerToken) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `This is not yet your turn`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `This is not yet your turn`));
 						} else {
 							const flagAll = (event.payload.flag & FLAG_SHIFT) > 0;
 							const flagDdc = (event.payload.flag & FLAG_ALT) > 0;
 							if (games[event.payload.gameToken].round === 0) {
 								// Setup phase
 								if (games[event.payload.gameToken].round < 0) {
-									messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
+									messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not yet started`));
 								} else {
 									if (players[event.payload.playerToken].holdings[event.payload.territoryName]) {
 										// Clicked on owned territory, add troops from the player's reinforcement pool, go to next player
 										if (players[event.payload.playerToken].reinforcement > 0) {
 											let amount = (flagAll && !flagDdc) ? players[event.payload.playerToken].reinforcement : (!flagAll && flagDdc) ? -1 : 1;
-											commits.push(
-												createCommit().addEvent<TroopPlaced>({
-													type: 'TroopPlaced',
-													payload : {
-														playerToken: event.payload.playerToken,
-														gameToken: event.payload.gameToken,
-														territoryName: event.payload.territoryName,
-														amount
-													}
-												}).build()
+											troopPlaced(
+												world, players, games,
+												event.payload.playerToken,
+												event.payload.gameToken,
+												event.payload.territoryName,
+												amount
 											);
 										}
 									} // else ignore the click on other's territory
@@ -299,43 +308,32 @@ export const reducer = (
 							} else {
 								// Gameplay phase
 								if (games[event.payload.gameToken].round <= 0) {
-									messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
+									messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not yet started`));
 								} else {
 									if (players[event.payload.playerToken].reinforcement > 0) {
 										// Start turn phase
 										let amount = (flagAll) ? players[event.payload.playerToken].reinforcement : 1;
-										commits.push(
-											createCommit().addEvent<TroopPlaced>({
-												type: 'TroopPlaced',
-												payload : {
-													playerToken: event.payload.playerToken,
-													gameToken: event.payload.gameToken,
-													territoryName: event.payload.territoryName,
-													amount
-												}
-											}).build()
+										troopPlaced(
+											world, players, games,
+											event.payload.playerToken,
+											event.payload.gameToken,
+											event.payload.territoryName,
+											amount
 										);
 									} else {
 										// Battle phase
 										if (players[event.payload.playerToken].holdings[event.payload.territoryName]) {
-											commits.push(
-												createCommit().addEvent<TerritorySelected>({
-													type: 'TerritorySelected',
-													payload: {
-														playerToken: event.payload.playerToken,
-														gameToken: event.payload.gameToken,
-														territoryName: event.payload.territoryName
-													}
-												}).build()
-											);
+											// Click on the player's own territory
+										} else if (!map[players[event.payload.playerToken].selected as Territories].connected.has(event.payload.territoryName as Territories)) {
+											messages.push(buildMessage(commit.id, MessageType.Message, event.type, `Territories not connected`)); // Ignore move
 										} else {
 											// ATTACK!
-											const fromTerritory = games[event.payload.gameToken].selected[games[event.payload.gameToken].turns];
+											const fromTerritory = players[event.payload.playerToken].selected;
 											const attackers = players[event.payload.playerToken].holdings[fromTerritory].troop;
 											const defender = games[event.payload.gameToken].players.filter(p =>
 												players[p].holdings[event.payload.territoryName]);
 											if (defender.length <= 0) {
-												messages.push(buildMessage(commit.id, MessageType.Error, `Cannot find owner of ${event.payload.territoryName}`));
+												messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Cannot find owner of ${event.payload.territoryName}`));
 											} else {
 												const defenders = players[defender[0]].holdings[event.payload.territoryName].troop;
 												const result = rules.doBattle(attackers, defenders); // TODO record the dice results somewhere!!!
@@ -363,51 +361,54 @@ export const reducer = (
 
 					case 'TerritorySelected':
 						if (!players[event.payload.playerToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
 						} else if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
 						} else if (!map[event.payload.territoryName as Territories]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Unknown territory ${event.payload.territoryName}`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Unknown territory ${event.payload.territoryName}`));
 						} else if (games[event.payload.gameToken].round < 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not yet started`));
 						} else if (games[event.payload.gameToken].status !== Status.Ready) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not ready`));
 						} else if (games[event.payload.gameToken].players[games[event.payload.gameToken].turns] !== event.payload.playerToken) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `This is not yet your turn`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `This is not yet your turn`));
+						} else if (!players[event.payload.playerToken].holdings[event.payload.territoryName]) {
+							messages.push(buildMessage(commit.id, MessageType.Message, event.type, `${event.payload.territoryName} is not your territory`));
 						} else {
-							games[event.payload.gameToken].selected[games[event.payload.gameToken].turns] = event.payload.territoryName
+							players[event.payload.playerToken].selected = event.payload.territoryName;
 						}
 						break;
 
 					case 'TerritoryAttacked':
-						// TODO: check territories are connected.....................
 						if (!players[event.payload.fromPlayer]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.fromPlayer} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.fromPlayer} not found`));
 						} else if (!players[event.payload.toPlayer]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.toPlayer} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.toPlayer} not found`));
 						} else if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
 						} else if (!map[event.payload.fromTerritory as Territories]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Unknown territory ${event.payload.fromTerritory}`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Unknown territory ${event.payload.fromTerritory}`));
 						} else if (!map[event.payload.toTerritory as Territories]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Unknown territory ${event.payload.toTerritory}`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Unknown territory ${event.payload.toTerritory}`));
+						} else if (!map[event.payload.fromTerritory as Territories].connected.has(event.payload.toTerritory as Territories)) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Territories not connected`));
 						} else if (games[event.payload.gameToken].round <= 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not yet started`));
 						} else if (games[event.payload.gameToken].status !== Status.Ready) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not ready`));
 						} else if (games[event.payload.gameToken].players[games[event.payload.gameToken].turns] !== event.payload.fromPlayer) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `This is not yet your turn`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `This is not yet your turn`));
 						} else if (!players[event.payload.fromPlayer].holdings[event.payload.fromTerritory]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Territory ${event.payload.fromTerritory} not owned by attacker`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Territory ${event.payload.fromTerritory} not owned by attacker`));
 						} else if (!players[event.payload.toPlayer].holdings[event.payload.toTerritory]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Territory ${event.payload.toTerritory} not owned by defender`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Territory ${event.payload.toTerritory} not owned by defender`));
 						} else if (
 							(event.payload.attackerLoss < 0) || (event.payload.defenderLoss < 0) ||
 							((event.payload.attackerLoss === 0) && (event.payload.defenderLoss === 0))
 						) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Invalid inputs: attacker loss ${event.payload.attackerLoss} / defender loss ${event.payload.defenderLoss}`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Invalid inputs: attacker loss ${event.payload.attackerLoss} / defender loss ${event.payload.defenderLoss}`));
 						} else if (players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop <= event.payload.attackerLoss) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Attacker loss larger than attacker's troops number`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Attacker loss larger than attacker's troops number`));
 						} else {
 							players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop -= event.payload.attackerLoss;
 							if (players[event.payload.toPlayer].holdings[event.payload.toTerritory].troop > event.payload.defenderLoss)
@@ -418,11 +419,11 @@ export const reducer = (
 									createCommit().addEvent<TerritoryConquered>({
 										type: 'TerritoryConquered',
 										payload: {
-											fromPlayer: event.payload.playerToken,
+											fromPlayer: event.payload.fromPlayer,
 											toPlayer: event.payload.toPlayer,
 											gameToken: event.payload.gameToken,
 											fromTerritory: event.payload.fromTerritory,
-											toTerritory: event.payload.territoryName
+											toTerritory: event.payload.toTerritory
 										}
 									}).build()
 								);
@@ -432,91 +433,59 @@ export const reducer = (
 
 					case 'TerritoryConquered':
 						if (!players[event.payload.fromPlayer]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.fromPlayer} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.fromPlayer} not found`));
 						} else if (!players[event.payload.toPlayer]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.toPlayer} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.toPlayer} not found`));
 						} else if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
 						} else if (!map[event.payload.fromTerritory as Territories]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Unknown territory ${event.payload.fromTerritory}`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Unknown territory ${event.payload.fromTerritory}`));
 						} else if (!map[event.payload.toTerritory as Territories]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Unknown territory ${event.payload.toTerritory}`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Unknown territory ${event.payload.toTerritory}`));
 						} else if (games[event.payload.gameToken].round <= 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not yet started`));
 						} else if (games[event.payload.gameToken].status !== Status.Ready) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not ready`));
 						} else if (games[event.payload.gameToken].players[games[event.payload.gameToken].turns] !== event.payload.fromPlayer) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `This is not yet your turn`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `This is not yet your turn`));
 						} else if (!players[event.payload.fromPlayer].holdings[event.payload.fromTerritory]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Territory ${event.payload.fromTerritory} not owned by attacker`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Territory ${event.payload.fromTerritory} not owned by attacker`));
 						} else if (!players[event.payload.toPlayer].holdings[event.payload.toTerritory]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Territory ${event.payload.toTerritory} not owned by defender`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Territory ${event.payload.toTerritory} not owned by defender`));
 						} else {
 							delete players[event.payload.toPlayer].holdings[event.payload.toTerritory];
 							players[event.payload.fromPlayer].holdings[event.payload.toTerritory] = map[event.payload.toTerritory as Territories];
 							players[event.payload.fromPlayer].holdings[event.payload.toTerritory].troop = players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop - 1;
 							players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop = 1;
-							// Remember player can get card at end of turn
 						}
 						break;
 
 					case 'TerritoryFortified':
-						// TODO
-						break;
-
-					case 'PlayerDefeated':
-						// TODO
-						break;
-
-					case 'TroopPlaced':
 						if (!players[event.payload.playerToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Player ${event.payload.playerToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
 						} else if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
 						} else if (!map[event.payload.territoryName as Territories]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Unknown territory ${event.payload.territoryName}`));
-						} else if (games[event.payload.gameToken].round < 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
-						} else if (games[event.payload.gameToken].status !== Status.Ready) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Unknown territory ${event.payload.territoryName}`));
 						} else if (games[event.payload.gameToken].players[games[event.payload.gameToken].turns] !== event.payload.playerToken) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `This is not yet your turn`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `This is not yet your turn`));
 						} else if (!players[event.payload.playerToken].holdings[event.payload.territoryName]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `This is not your territory`));
-						} else if (players[event.payload.playerToken].reinforcement < event.payload.amount) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Insufficient reinforcement left`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `${event.payload.territoryName} is not your territory`));
 						} else {
-							if (players[event.payload.playerToken].reinforcement <= 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, `Turn already started`));
+							const fromTerritory = players[event.payload.playerToken].selected;
+							if (!players[event.payload.playerToken].holdings[fromTerritory]) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `${fromTerritory} is not your territory`));
+							} else if (event.payload.amount >= players[event.payload.playerToken].holdings[fromTerritory].troop) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `${fromTerritory} does not have enough troops to move`));
 							} else {
-								if (event.payload.amount !== 0) {
-									// Both setup phase and game-play phase
-									players[event.payload.playerToken].holdings[event.payload.territoryName].troop += event.payload.amount;
-									players[event.payload.playerToken].reinforcement -= event.payload.amount;
-								}
-								if ((games[event.payload.gameToken].round === 0) && (event.payload.amount >= 0)) {
-									// Setup phase
-									// If player remove a troop from a territory, stay in that player's turn
-									games[event.payload.gameToken].turns ++;
-									if (games[event.payload.gameToken].turns >= games[event.payload.gameToken].players.length)
-										games[event.payload.gameToken].turns = 0;
-
-									if (games[event.payload.gameToken].players.filter(k => players[k].reinforcement > 0).length <= 0) {
-										commits.push(
-											createCommit().addEvent<SetupFinished>({
-												type: 'SetupFinished',
-												payload: { gameToken: event.payload.gameToken }
-											}).build()
-										);
-									}
-								}
+								players[event.payload.playerToken].holdings[fromTerritory].troop -= event.payload.amount;
+								players[event.payload.playerToken].holdings[event.payload.territoryName].troop += event.payload.amount;
 								commits.push(
-									createCommit().addEvent<TerritorySelected>({
-										type: 'TerritorySelected',
+									createCommit().addEvent<TurnEnded>({
+										type: 'TurnEnded',
 										payload: {
 											playerToken: event.payload.playerToken,
-											gameToken: event.payload.gameToken,
-											territoryName: event.payload.territoryName
+											gameToken: event.payload.gameToken
 										}
 									}).build()
 								);
@@ -524,35 +493,86 @@ export const reducer = (
 						}
 						break;
 
-					case 'TurnStarted':
-						if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
-						} else if (games[event.payload.gameToken].round <= 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
-						} else if (games[event.payload.gameToken].status !== Status.Ready) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not ready`));
-						} else if (games[event.payload.gameToken].players.filter(k => players[k].reinforcement > 0).length > 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Reinforcement remaining, setup not yet finish`));
-						} else {
-							const playerToken = games[event.payload.gameToken].players[games[event.payload.gameToken].turns];
-							commits.push(
-								createCommit().addEvent<ReinforcementArrived>({
-									type: 'ReinforcementArrived',
-									payload: { playerToken, gameToken: event.payload.gameToken }
-								}).build()
-							);
-						}
+					case 'PlayerDefeated':
+						// TODO
 						break;
 
+					// case 'TroopPlaced':
+					// 	if (!players[event.payload.playerToken]) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
+					// 	} else if (!games[event.payload.gameToken]) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
+					// 	} else if (!map[event.payload.territoryName as Territories]) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Unknown territory ${event.payload.territoryName}`));
+					// 	} else if (games[event.payload.gameToken].round < 0) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not yet started`));
+					// 	} else if (games[event.payload.gameToken].status !== Status.Ready) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not ready`));
+					// 	} else if (games[event.payload.gameToken].players[games[event.payload.gameToken].turns] !== event.payload.playerToken) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `This is not yet your turn`));
+					// 	} else if (!players[event.payload.playerToken].holdings[event.payload.territoryName]) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `This is not your territory`));
+					// 	} else if (players[event.payload.playerToken].reinforcement < event.payload.amount) {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Insufficient reinforcement left`));
+					// 	} else {
+					// 		if (players[event.payload.playerToken].reinforcement <= 0) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Turn already started`));
+					// 		} else {
+					// 			if (event.payload.amount !== 0) {
+					// 				// Both setup phase and game-play phase
+					// 				players[event.payload.playerToken].holdings[event.payload.territoryName].troop += event.payload.amount;
+					// 				players[event.payload.playerToken].reinforcement -= event.payload.amount;
+					// 			}
+					// 			if ((games[event.payload.gameToken].round === 0) && (event.payload.amount >= 0)) {
+					// 				// Setup phase
+					// 				// If player remove a troop from a territory, stay in that player's turn
+					// 				games[event.payload.gameToken].turns ++;
+					// 				if (games[event.payload.gameToken].turns >= games[event.payload.gameToken].players.length)
+					// 					games[event.payload.gameToken].turns = 0;
+
+					// 				if (games[event.payload.gameToken].players.filter(k => players[k].reinforcement > 0).length <= 0) {
+					// 					// SetupFinished
+					// 					games[event.payload.gameToken].turns = 0;
+					// 					games[event.payload.gameToken].round = 1;
+					// 					turnStarted(world, players, games, event.payload.gameToken);
+					// 				}
+					// 			}
+					// 		}
+					// 	}
+					// 	break;
+
 					case 'TurnEnded':
-						// TODO
+						if (!players[event.payload.playerToken]) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player ${event.payload.playerToken} not found`));
+						} else if (!games[event.payload.gameToken]) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
+						} else if (games[event.payload.gameToken].status !== Status.Ready) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not ready`));
+						} else if (games[event.payload.gameToken].players[games[event.payload.gameToken].turns] !== event.payload.playerToken) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `This is not yet your turn`));
+						} else {
+							const holdings = Object.keys(players[event.payload.playerToken].holdings).length;
+							if (holdings > players[event.payload.playerToken].holdingsCount) {
+								const card = games[event.payload.gameToken].cards.pop();
+								if (card)
+									players[event.payload.playerToken].cards[card.name] = card;
+								else
+									messages.push(buildMessage(commit.id, MessageType.Error, event.type, `No card left in the deck!!!`));
+							}
+							games[event.payload.gameToken].turns ++;
+							if (games[event.payload.gameToken].turns >= games[event.payload.gameToken].players.length) {
+								games[event.payload.gameToken].turns = 0;
+								games[event.payload.gameToken].round ++;
+							}
+							turnStarted(world, players, games, event.payload.gameToken);
+						}
 						break;
 
 					case 'CardReturned':
 						if (!games[event.payload.gameToken]) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${event.payload.gameToken} not found`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} not found`));
 						} else if (games[event.payload.gameToken].round < 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, `Game ${games[event.payload.gameToken].name} not yet started`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${games[event.payload.gameToken].name} not yet started`));
 						} else {
 							games[event.payload.gameToken].cards.push(deck[event.payload.cardName as Territories | WildCards]);
 						}

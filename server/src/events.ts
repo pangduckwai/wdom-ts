@@ -68,12 +68,12 @@ export interface SetupBegun extends BaseEvent {
 	}
 }
 
-export interface SetupFinished extends BaseEvent {
-	readonly type: 'SetupFinished';
-	payload: {
-		gameToken: string;
-	}
-}
+// export interface SetupFinished extends BaseEvent {
+// 	readonly type: 'SetupFinished';
+// 	payload: {
+// 		gameToken: string;
+// 	}
+// }
 
 export interface TerritoryAssigned extends BaseEvent {
 	readonly type: 'TerritoryAssigned';
@@ -84,13 +84,13 @@ export interface TerritoryAssigned extends BaseEvent {
 	}
 }
 
-export interface ReinforcementArrived extends BaseEvent {
-	readonly type: 'ReinforcementArrived';
-	payload: {
-		playerToken?: string;
-		gameToken: string;
-	}
-}
+// export interface ReinforcementArrived extends BaseEvent {
+// 	readonly type: 'ReinforcementArrived';
+// 	payload: {
+// 		playerToken?: string;
+// 		gameToken: string;
+// 	}
+// }
 
 export interface MoveMade extends BaseEvent {
 	readonly type: 'MoveMade';
@@ -142,8 +142,7 @@ export interface TerritoryFortified extends BaseEvent {
 	payload: {
 		playerToken: string;
 		gameToken: string;
-		fromTerritory: string;
-		toTerritory: string;
+		territoryName: string;
 		amount: number;
 	}
 }
@@ -158,16 +157,16 @@ export interface PlayerDefeated extends BaseEvent {
 	}
 }
 
-/** Placing troops on map (both during game setup and add reinforcement */
-export interface TroopPlaced extends BaseEvent {
-	readonly type: 'TroopPlaced';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-		territoryName: string;
-		amount: number;
-	}
-}
+// /** Placing troops on map (both during game setup and add reinforcement */
+// export interface TroopPlaced extends BaseEvent {
+// 	readonly type: 'TroopPlaced';
+// 	payload: {
+// 		playerToken: string;
+// 		gameToken: string;
+// 		territoryName: string;
+// 		amount: number;
+// 	}
+// }
 
 // /** Placing reinforcement during reinforcement stage */
 // export interface TroopAdded extends BaseEvent {
@@ -188,13 +187,6 @@ export interface TroopPlaced extends BaseEvent {
 // 		amount: number;
 // 	}
 // }
-
-export interface TurnStarted extends BaseEvent {
-	readonly type: 'TurnStarted';
-	payload: {
-		gameToken: string;
-	}
-}
 
 export interface TurnEnded extends BaseEvent {
 	readonly type: 'TurnEnded';
