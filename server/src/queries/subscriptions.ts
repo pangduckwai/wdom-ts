@@ -80,28 +80,11 @@ export const Subscriptions = (
 								}
 								subscribers[channel].lastPosition = notification.index + 1;
 
-								let depth = 10; // prevent infinite loop
-								let results: {
-									players: Record<string, Player>,
-									games: Record<string, Game>,
-									messages: Message[],
-									commits: Commit[]
-								} = {
+								const results = reducer(world, map, deck)(incomings, {
 									players: subscribers[channel].players,
-									games: subscribers[channel].games,
-									messages: [],
-									commits: incomings
-								};
-								do {
-									if (depth < 10) console.log('HOHOHOHOHOHOHO', depth, Date.now(), results.commits.map(c => c.events[0].type)); // TODO TEMP
-									// Some events will generate additional events that need to be processed, pass into reducer again
-									const r = reducer(world, map, deck)(results.commits, {
-										players: results.players,
-										games: results.games
-									});
-									depth --;
-									results = r;
-								} while ((results.commits.length > 0) && (depth > 0));
+									games: subscribers[channel].games
+								});
+
 								subscribers[channel].players = results.players;
 								subscribers[channel].games = results.games;
 								subscribers[channel].messages.push(...results.messages);

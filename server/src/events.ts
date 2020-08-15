@@ -78,7 +78,6 @@ export interface SetupBegun extends BaseEvent {
 export interface TerritoryAssigned extends BaseEvent {
 	readonly type: 'TerritoryAssigned';
 	payload: {
-		playerToken?: string;
 		gameToken: string;
 		territoryName: string;
 	}
@@ -92,15 +91,15 @@ export interface TerritoryAssigned extends BaseEvent {
 // 	}
 // }
 
-export interface MoveMade extends BaseEvent {
-	readonly type: 'MoveMade';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-		territoryName: string;
-		flag: number;
-	}
-}
+// export interface MoveMade extends BaseEvent {
+// 	readonly type: 'MoveMade';
+// 	payload: {
+// 		playerToken: string;
+// 		gameToken: string;
+// 		territoryName: string;
+// 		flag: number;
+// 	}
+// }
 
 export interface TerritorySelected extends BaseEvent {
 	readonly type: 'TerritorySelected';
@@ -111,6 +110,17 @@ export interface TerritorySelected extends BaseEvent {
 	}
 }
 
+/** Placing troops on map (both during game setup and add reinforcement at start of turns */
+	export interface TroopPlaced extends BaseEvent {
+		readonly type: 'TroopPlaced';
+		payload: {
+			playerToken: string;
+			gameToken: string;
+			territoryName: string;
+			amount: number;
+		}
+	}
+	
 /** fromPlayer is the attacker, toPlayer is the defender */
 export interface TerritoryAttacked extends BaseEvent {
 	readonly type: 'TerritoryAttacked';
@@ -125,24 +135,25 @@ export interface TerritoryAttacked extends BaseEvent {
 	}
 }
 
-/** fromPlayer is the conquerer, toPlayer is the original owner */
-export interface TerritoryConquered extends BaseEvent {
-	readonly type: 'TerritoryConquered';
-	payload: {
-		fromPlayer: string;
-		toPlayer: string;
-		gameToken: string;
-		fromTerritory: string;
-		toTerritory: string;
-	}
-}
+// /** fromPlayer is the conquerer, toPlayer is the original owner */
+// export interface TerritoryConquered extends BaseEvent {
+// 	readonly type: 'TerritoryConquered';
+// 	payload: {
+// 		fromPlayer: string;
+// 		toPlayer: string;
+// 		gameToken: string;
+// 		fromTerritory: string;
+// 		toTerritory: string;
+// 	}
+// }
 
 export interface TerritoryFortified extends BaseEvent {
 	readonly type: 'TerritoryFortified';
 	payload: {
 		playerToken: string;
 		gameToken: string;
-		territoryName: string;
+		fromTerritory: string;
+		toTerritory: string;
 		amount: number;
 	}
 }
@@ -156,17 +167,6 @@ export interface PlayerDefeated extends BaseEvent {
 		gameToken: string;
 	}
 }
-
-// /** Placing troops on map (both during game setup and add reinforcement */
-// export interface TroopPlaced extends BaseEvent {
-// 	readonly type: 'TroopPlaced';
-// 	payload: {
-// 		playerToken: string;
-// 		gameToken: string;
-// 		territoryName: string;
-// 		amount: number;
-// 	}
-// }
 
 // /** Placing reinforcement during reinforcement stage */
 // export interface TroopAdded extends BaseEvent {

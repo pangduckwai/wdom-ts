@@ -2,9 +2,9 @@ import { _shuffle, Territories, WildCards } from '../rules';
 import {
 	createCommit, PlayerRegistered, PlayerLeft,
 	GameOpened, GameClosed, GameJoined, GameQuitted, GameStarted,
-	SetupBegun, TerritoryAssigned, MoveMade,
-	TerritoryConquered, TerritoryFortified, TerritorySelected, PlayerDefeated,
-	TurnEnded, CardReturned, CardsRedeemed, GameWon
+	SetupBegun, TerritoryAssigned, TerritoryAttacked,
+	TerritoryFortified, TerritorySelected, TroopPlaced,
+	TurnEnded, CardReturned, CardsRedeemed, PlayerDefeated, GameWon
 } from '..';
 
 export const Commands = {
@@ -70,9 +70,21 @@ export const Commands = {
 	// 		type: 'SetupFinished',
 	// 		payload
 	// 	}).build(),
-	MakeMove: (payload: { playerToken: string; gameToken: string; territoryName: string; flag: number }) =>
-		createCommit().addEvent<MoveMade>({
-			type: 'MoveMade',
+	// MakeMove: (payload: { playerToken: string; gameToken: string; territoryName: string; flag: number }) =>
+	// 	createCommit().addEvent<MoveMade>({
+	// 		type: 'MoveMade',
+	// 		payload
+	// 	}).addEvent<TerritorySelected>({
+	// 		type: 'TerritorySelected',
+	// 		payload: {
+	// 			playerToken: payload.playerToken,
+	// 			gameToken: payload.gameToken,
+	// 			territoryName: payload.territoryName
+	// 		}
+	// 	}).build(),
+	PlaceTroop: (payload: { playerToken: string; gameToken: string; territoryName: string; amount: number }) => {
+		return createCommit().addEvent<TroopPlaced>({
+			type: 'TroopPlaced',
 			payload
 		}).addEvent<TerritorySelected>({
 			type: 'TerritorySelected',
@@ -81,19 +93,28 @@ export const Commands = {
 				gameToken: payload.gameToken,
 				territoryName: payload.territoryName
 			}
+		}).build();
+	},
+	AttackTerritory: (payload: {
+		fromPlayer: string;
+		toPlayer: string;
+		gameToken: string;
+		fromTerritory: string;
+		toTerritory: string;
+		attackerLoss: number;
+		defenderLoss: number;
+	}) =>
+		createCommit().addEvent<TerritoryAttacked>({
+			type: 'TerritoryAttacked',
+			payload
+		}).addEvent<TerritorySelected>({
+			type: 'TerritorySelected',
+			payload: {
+				playerToken: payload.fromPlayer,
+				gameToken: payload.gameToken,
+				territoryName: payload.toTerritory
+			}
 		}).build(),
-	// AttackTerritory: (payload: {
-	// 	playerToken: string;
-	// 	gameToken: string;
-	// 	fromTerritory: string;
-	// 	toTerritory: string;
-	// 	attackerLoss: number;
-	// 	defenderLoss: number;
-	// }) =>
-	// 	createCommit().addEvent<TerritoryAttacked>({
-	// 		type: 'TerritoryAttacked',
-	// 		payload
-	// 	}).build(),
 	// ConquerTerritory: (payload: {
 	// 	fromPlayer: string;
 	// 	toPlayer: string;
@@ -108,7 +129,8 @@ export const Commands = {
 	Fortify: (payload: {
 		playerToken: string;
 		gameToken: string;
-		territoryName: string;
+		fromTerritory: string;
+		toTerritory: string;
 		amount: number;
 	}) =>
 		createCommit().addEvent<TerritoryFortified>({
@@ -120,17 +142,6 @@ export const Commands = {
 			type: 'PlayerDefeated',
 			payload
 		}).build(),
-	// PlaceTroop: (payload: { playerToken: string; gameToken: string; territoryName: string; amount: number }) => {
-	// 	return createCommit().addEvent<TroopPlaced>({
-	// 		type: 'TroopPlaced',
-	// 		payload
-	// 	}).build();
-	// },
-	// NextPlayer: (payload: { fromPlayer: string; toPlayer: string; gameToken: string }) =>
-	// 	createCommit().addEvent<NextPlayer>({
-	// 		type: 'NextPlayer',
-	// 		payload
-	// 	}).build(),
 	EndTurn: (payload: { playerToken: string; gameToken: string }) =>
 		createCommit().addEvent<TurnEnded>({
 			type: 'TurnEnded',
@@ -154,4 +165,9 @@ export const Commands = {
 			type: 'GameWon',
 			payload
 		}).build(),
+	// NextPlayer: (payload: { fromPlayer: string; toPlayer: string; gameToken: string }) =>
+	// 	createCommit().addEvent<NextPlayer>({
+	// 		type: 'NextPlayer',
+	// 		payload
+	// 	}).build(),
 };

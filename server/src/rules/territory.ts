@@ -69,7 +69,7 @@ export const Territories = [
 export type Territories = typeof Territories[number];
 
 export const buildMap = (): Record<Territories, Territory> => {
-	return { // TODO what about the 2 wild cards
+	return {
 		['Congo']: {
 			name: 'Congo', troop: 0, continent: 'Africa', connected: new Set(['East-Africa', 'North-Africa', 'South-Africa'])
 		},
