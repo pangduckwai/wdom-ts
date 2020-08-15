@@ -1,5 +1,53 @@
 import { Redis } from 'ioredis';
-import { Commit, toCommits } from '..';
+import { BaseEvent, deserialize, generateToken } from '..';
+import { BusyTimeout } from '.';
+
+export interface Commit {
+	id: string;
+	version: number;
+	events: BaseEvent[];
+	timestamp?: number;
+};
+
+export const isCommit = (variable: any): variable is Commit => {
+	const val = variable as Commit;
+	return (val.id !== undefined) &&
+		(val.version !== undefined) &&
+		(val.events && (val.events.length > 0));
+};
+
+export const toCommits = (tag: string, values: string[][]) => {
+	const results: Commit[] = [];
+	for (const value of values) {
+		const commit = deserialize(tag, value[1], isCommit);
+		commit.id = value[0];
+		results.push(commit);
+	}
+	return results;
+};
+
+export const createCommit = () => {
+	const commit: Commit = {
+		id: '',
+		version: 0,
+		events: []
+	};
+
+	const build = (): Commit => {
+		if (commit.events.length < 1)  throw new Error('[createCommit] Invalid parameter(s)');
+		return commit;
+	}
+
+	const addEvent = <E extends BaseEvent>(event: E) => {
+		commit.events.push(event);
+		return {
+			build,
+			addEvent
+		};
+	}
+
+	return { addEvent };
+};
 
 /* NOTE HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 The following can calc number of digits needed,
@@ -16,81 +64,73 @@ this script is called individually
 */
 // KEYS[1] - Publish channel
 // KEYS[2] - Commit
-// KEYS[3] - Commit index (id vs index)
-// ARGV[1] - Commit id
-// ARGV[2] - Serialized commit object
+// KEYS[3] - Is Busy
+// ARGV[1] - Serialized commit object
+// ARGV[2] - Timestamp offset
 const put = `
-local cnt = redis.call("rpush", KEYS[2], ARGV[2])
-if cnt > 0 then
-	local idx = cnt - 1
-	local rtn = redis.call("hset", KEYS[3], ARGV[1], idx)
-	if rtn == 1 then
-		redis.call("publish", KEYS[1], '{"id":"' .. ARGV[1] .. '","index":' .. idx .. '}')
-		return idx
-	else
-		return redis.error_reply("[CommitStore] error writing commit index (" .. rtn .. ")")
-	end
-else
-	return redis.error_reply("[CommitStore] unknown error when writing commit (" .. cnt .. ")")
-end`;
-
-// KEYS[1] - Commit
-// KEYS[2] - Commit index (id vs index)
-// ARGV[1] - Commit id
-const get = `
-local result = {}
-local idx = redis.call("hget", KEYS[2], ARGV[1])
-if idx then
-	local item = redis.call("lindex", KEYS[1], idx)
-	if item then
-		table.insert(result, item)
-		return result
-	else
-		return nil
-	end
-else
+local isbusy = redis.call("get", KEYS[3])
+if isbusy then
 	return nil
+else
+	redis.call("set", KEYS[3], "true", "px", ${BusyTimeout})
+
+	local sid = redis.call("xadd", KEYS[2], "*", "commit", ARGV[1])
+	if sid then
+		redis.call("publish", KEYS[1], sid)
+
+		local cnt = 0
+		local expire = redis.call("xrange", KEYS[2], "-", ARGV[2])
+		for i = 1, #expire do
+			cnt = cnt + redis.call("xdel", KEYS[2], expire[i][1])
+		end
+
+		return sid
+	else
+		return redis.error_reply("[CommitStore] error writing commit")
+	end
 end`;
 
-export const CommitStore = (client: Redis) => {
+export const CommitStore = (client: Redis, ttl?: number) => {
+	const _ttl = ttl ? ttl : 86400000; // 1 day == 24x60x60x1000 milliseconds
 	return {
 		put: (channel: string, commit: Commit): Promise<Commit> => {
 			return new Promise<Commit>(async (resolve, reject) => {
 				const timestamp = Date.now();
+				const offset = '' + (timestamp - _ttl);
 				try {
-					commit.timestamp = timestamp;
 					const result = await client.eval(put, 3, [
 						channel,
 						`${channel}:Commit`,
-						`${channel}:Commit:Idx`,
-						commit.id, JSON.stringify(commit)
+						`${channel}:Busy`,
+						JSON.stringify(commit), offset
 					]);
-					if (result >= 0) {
+					if (result) {
+						commit.id = result;
+						commit.timestamp = timestamp;
 						resolve(commit);
 					} else {
-						reject(new Error(result));
+						reject(null); // busy
 					}
 				} catch (error) {
-					reject(error);
+					reject(error); // redis.error_reply
 				}
 			});
 		},
 		get: (channel: string, args?: {
 			id?: string;
-			from?: number;
-			to?: number;
+			from?: string;
+			to?: string;
 		}): Promise<Commit[]> => {
 			return new Promise<Commit[]>(async (resolve, reject) => {
 				const { id, from, to } = args ? args : { id: undefined, from: undefined, to: undefined };
 				const key1 = `${channel}:Commit`;
-				const key2 = `${channel}:Commit:Idx`;
 
-				const result = (id) ?
-					await client.eval(get, 2, [key1, key2, id]) :
-					await client.lrange(key1, from ? from : 0, to ? to : -1);
-				if (result) {
+				const results = (id) ?
+					await client.xrange(key1, id, id) :
+					await client.xrange(key1, from ? from : '-', to ? to : '+');
+				if (results.length > 0) {
 					try {
-						resolve(toCommits('[CommitStore]', result));
+						resolve(toCommits('[CommitStore]', results.map(result => [result[0][0], result[0][1][1]])));
 					} catch (error) {
 						reject(error);
 					}

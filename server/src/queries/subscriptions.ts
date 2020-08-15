@@ -1,10 +1,9 @@
 import { Redis } from 'ioredis';
 import { fromEventPattern, Observable, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
-import { CommitStore } from '../commands';
+import { Commit, CommitStore } from '../commands';
 import { Card, Continent, Continents, Territory, Territories, WildCards } from '../rules';
-import { Commit, deserialize, isNotification } from '..';
-import { Game, Message, Player, reducer } from '.';
+import { Game, Message, Player, reducer, Snapshot } from '.';
 
 export const Subscriptions = (
 	client: Redis,
@@ -15,7 +14,7 @@ export const Subscriptions = (
 	const subscribers: Record<string, {
 		ready: boolean,
 		subscriber: Redis,
-		lastPosition?: number,
+		lastPosition?: string,
 		subscribe$?: Subscription,
 		players: Record<string, Player>,
 		games: Record<string, Game>,
@@ -24,8 +23,13 @@ export const Subscriptions = (
 
 	const commitStore: {
 		put: (channel: string, commit: Commit) => Promise<Commit>,
-		get: (channel: string, args?: { id?: string; from?: number; to?: number}) => Promise<Commit[]>
+		get: (channel: string, args?: { id?: string; from?: string; to?: string}) => Promise<Commit[]>
 	} = CommitStore(client);
+
+	const snapshot: {
+		take: (channel: string, { players, games }: { players: Record<string, Player>, games: Record<string, Game>}) => Promise<number>,
+		read: (channel: string) => Promise<{ players: Record<string, Player>, games: Record<string, Game>}>
+	} = Snapshot(client);
 
 	return {
 		start: (channel: string): Promise<number> => {
@@ -70,15 +74,19 @@ export const Subscriptions = (
 						)
 						.subscribe({
 							next: async event => {
-								const notification = deserialize('[Subscriptions]', event.message, isNotification);
-								const criteria: { from?: number; to?: number } = { to: notification.index };
+								const notification: string = event.message;
+								const criteria: { from?: string; to?: string } = { to: notification };
 
 								if (subscribers[channel].lastPosition) criteria.from = subscribers[channel].lastPosition;
 								const incomings = await commitStore.get(event.channel, criteria);
-								if (incomings.length > 1) {
-									console.log("HEREHEREHERE", event.message, subscribers[channel].lastPosition, notification.index); // TODO TEMP
+								if (incomings.length > 0) { // 1
+									console.log("HEREHEREHERE", incomings.length, subscribers[channel].lastPosition, notification); // TODO TEMP
 								}
-								subscribers[channel].lastPosition = notification.index + 1;
+
+								// Get 'next' position
+								const streamId = notification.split('-');
+								const nextId = parseInt(streamId[1], 10) + 1;
+								subscribers[channel].lastPosition = `${streamId[0]}-${nextId}`;
 
 								const results = reducer(world, map, deck)(incomings, {
 									players: subscribers[channel].players,
@@ -88,6 +96,11 @@ export const Subscriptions = (
 								subscribers[channel].players = results.players;
 								subscribers[channel].games = results.games;
 								subscribers[channel].messages.push(...results.messages);
+
+								await snapshot.take(channel, {
+									players: results.players,
+									games: results.games
+								});
 							},
 							error: error => reject(error),
 							complete: () => console.log('complete!')

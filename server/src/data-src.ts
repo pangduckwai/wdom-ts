@@ -1,6 +1,6 @@
 import { DataSource } from 'apollo-datasource';
 import { Redis } from 'ioredis';
-import { isNotification, toCommits } from './commands';
+// import { isNotification, toCommits } from './commands';
 import { Game, Player, reducer, PlayerSnapshot, GameSnapshot } from './queries';
 import { buildDeck, buildMap } from './rules';
 import { CHANNEL } from '.';

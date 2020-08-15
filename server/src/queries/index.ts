@@ -4,6 +4,7 @@ export * from './games';
 export * from './players';
 export * from './messages';
 export * from './reducer';
+export * from './snapshot';
 export * from './subscriptions';
 
 export const getToken = (input?: Game | Player | string) => {
