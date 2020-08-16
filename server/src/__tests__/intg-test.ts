@@ -5,14 +5,13 @@ jest.mock('../commands/index');
 import RedisClient, { Redis } from 'ioredis';
 // import { fromEventPattern, Observable, Subscription } from 'rxjs';
 // import { debounceTime, filter } from 'rxjs/operators';
-import { Commands, Commit, CommitStore, toCommits } from '../commands';
-import { Game, Message, Player, Subscriptions } from '../queries';
+import { BusyTimeout, Commands, Commit, getCommands, getCommitStore, toCommits } from '../commands';
+import { Game, getSnapshot, getSubscriptions, Message, Player, Snapshot, Subscriptions } from '../queries';
 import { buildDeck, buildMap, buildWorld, Card, rules, _shuffle, shuffle, Territories, WildCards } from '../rules';
 import { CHANNEL, deserialize, isEmpty } from '..';
 
 const output = (
 	reports: {
-		ready: boolean;
 		players: Record<string, Player>;
 		games: Record<string, Game>;
 		messages: Message[];
@@ -55,22 +54,10 @@ const gameHosts: Record<string, string[]> = {
 const channel = `${CHANNEL}intg`;
 let publisher: Redis;
 let subscriber: Redis;
-let commitStore: {
-	put: (channel: string, commit: Commit) => Promise<Commit>,
-	get: (channel: string, args?: { id?: string; from?: string; to?: string}) => Promise<Commit[]>
-};
-let subscriptions: {
-	start: (channel: string) => Promise<number>;
-	stop: (channel: string) => Promise<void>;
-	report: (channel: string) => Promise<{
-		ready: boolean;
-		players: Record<string, Player>;
-		games: Record<string, Game>;
-		messages: Message[];
-	}>;
-};
+let commands: Commands;
+let snapshot: Snapshot;
+let subscriptions: Subscriptions;
 let reports: {
-	ready: boolean;
 	players: Record<string, Player>;
 	games: Record<string, Game>;
 	messages: Message[];
@@ -79,14 +66,23 @@ let reports: {
 beforeAll(async () => {
 	publisher = new RedisClient({ host, port });
 	subscriber = new RedisClient({ host, port });
-	commitStore = CommitStore(publisher);
-	subscriptions = Subscriptions(publisher, world, map, deck);
+	commands = getCommands(getCommitStore(channel, publisher));
+	snapshot = getSnapshot(channel, publisher);
+	subscriptions = getSubscriptions(publisher, world, map, deck);
+	reports = {
+		players: {},
+		games: {},
+		messages: []
+	}
 
 	await subscriptions.start(channel)
 });
 
 afterAll(async () => {
-	await new Promise((resolve) => setTimeout(() => resolve(), 200));
+	await new Promise((resolve) => setTimeout(() => {
+		console.log(`Unit test of channel ${channel} finished. Busy timeout ${BusyTimeout}`);
+		resolve();
+	}, 200));
 	subscriptions.stop(channel);
 	await subscriber.quit();
 	await publisher.quit();
@@ -94,12 +90,73 @@ afterAll(async () => {
 });
 
 describe('Integration tests', () => {
+	const commits: Record<string, Commit> = {};
+
+	// it('register 2 players and open a game', async () => {
+	// 	const c = await commands.RegisterPlayer({ playerName: 'paul' });
+	// 	commits[c.id] = c;
+	// 	const d = await commands.RegisterPlayer({ playerName: 'jack' });
+	// 	commits[d.id] = d;
+	// 	const g = await commands.OpenGame({ playerToken: c.id, gameName: 'paul\'s game' });
+	// 	console.log(`c: ${JSON.stringify(c,null,' ')}\nd: ${JSON.stringify(d,null,' ')}\ng: ${JSON.stringify(g,null,' ')}`);
+	// });
+
+	// it('read the snapshot of the 2 registered players', async () => {
+	// 	const { players, games } = await snapshot.read();
+	// 	console.log('p', players);
+	// 	console.log('g', games);
+	// });
+
 	it('players register in game room', async () => {
 		for (const playerName of playerNames) {
-			await commitStore.put(channel, Commands.RegisterPlayer({ playerName: playerName }));
+			await commands.RegisterPlayer({ playerName: playerName });
 		}
-		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-		reports = await subscriptions.report(channel);
-		expect(Object.values(reports.players).map(p => p.name).sort()).toEqual(playerNames.sort());
+		const { players, games } = await snapshot.read();
+		reports.messages = await subscriptions.report(channel);
+		reports.players = players;
+		reports.games = games;
+		expect(Object.values(players).map(p => p.name).sort()).toEqual(playerNames.sort());
+	});
+
+	it('players leave game room', async () => {
+		for (const player of Object.values(reports.players).filter(p => p.name === 'dave' || p.name === 'bill')) {
+			await commands.PlayerLeave({ playerToken: player.token });
+		}
+		const { players, games } = await snapshot.read();
+		reports.messages = await subscriptions.report(channel);
+		reports.players = players;
+		reports.games = games;
+		expect(Object.values(reports.players).filter(p => p.status === 0).map(p => p.name).sort()).toEqual(['bill', 'dave']);
+	});
+
+	it('add duplicated player name', async () => {
+		await commands.RegisterPlayer({ playerName: 'josh' });
+		const { players, games } = await snapshot.read();
+		reports.messages = await subscriptions.report(channel);
+		reports.players = players;
+		reports.games = games;
+		expect(reports.messages.filter(m => m.message === 'Player josh already registered').length).toEqual(1);
+	});
+
+	it('non-existing player leave', async () => {
+		await commands.PlayerLeave({ playerToken: '1234567890' });
+		const { players, games } = await snapshot.read();
+		reports.messages = await subscriptions.report(channel);
+		reports.players = players;
+		reports.games = games;
+		expect(reports.messages.filter(m => m.message === 'Player 1234567890 not found').length).toEqual(1);
+	});
+
+	it('players open games', async () => {
+		for (const hostName of Object.keys(gameHosts)) {
+			const playerToken = Object.values(reports.players).filter(p => p.name === hostName)[0].token;
+			const gameName = `${hostName}'s game`;
+			await commands.OpenGame({ playerToken, gameName });
+		}
+		const { players, games } = await snapshot.read();
+		reports.messages = await subscriptions.report(channel);
+		reports.players = players;
+		reports.games = games;
+		expect(Object.values(reports.games).map(g => g.name).sort()).toEqual(Object.keys(gameHosts).map(n => `${n}'s game`).sort());
 	});
 });

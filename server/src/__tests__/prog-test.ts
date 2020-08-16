@@ -229,9 +229,10 @@ end`;
 	it('redis script test xrange', async () => {
 		const lua = `return redis.call("xadd", KEYS[1], "*", "commit", "Hello world")`;
 		const sid: string = await publisher.eval(lua, 1, topic);
-		const result = await publisher.xrange(topic, sid, sid);
-		console.log(`redis script test xrange\n${JSON.stringify(result, null, ' ')}\nresult[0][0] : ${result[0][0]}\nresult[0][1] : ${result[0][1]}`)
-		expect(result[0][1][1]).toEqual('Hello world');
+		const results = await publisher.xrange(topic, sid, sid);
+		const output = results.map(result => [result[0], result[1][1]]);
+		console.log(`redis script test xrange\n${JSON.stringify(output, null, ' ')}\nresult[0][0] : ${output[0][0]}\nresult[0][1] : ${output[0][1]}`);
+		expect(output[0][1]).toEqual('Hello world');
 	});
 
 	it('redis script test xrange out of range', async () => {

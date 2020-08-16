@@ -1,6 +1,8 @@
 import { Redis } from 'ioredis';
 import { BaseEvent, deserialize, generateToken } from '..';
 import { BusyTimeout } from '.';
+import { resolve } from 'path';
+import { rejects } from 'assert';
 
 export interface Commit {
 	id: string;
@@ -33,9 +35,16 @@ export const createCommit = () => {
 		events: []
 	};
 
-	const build = (): Commit => {
-		if (commit.events.length < 1)  throw new Error('[createCommit] Invalid parameter(s)');
-		return commit;
+	const build = async ({ put, get }: {
+		put: (commit: Commit) => Promise<Commit>,
+		get: (args?: { id?: string; from?: string; to?: string}) => Promise<Commit[]>
+	}): Promise<Commit> => {
+		if (commit.events.length < 1)
+			return new Promise<Commit>((_, reject) => {
+				reject(new Error('[createCommit] Invalid parameter(s)'));
+			});
+		else
+			return put(commit);
 	}
 
 	const addEvent = <E extends BaseEvent>(event: E) => {
@@ -68,32 +77,31 @@ this script is called individually
 // ARGV[1] - Serialized commit object
 // ARGV[2] - Timestamp offset
 const put = `
-local isbusy = redis.call("get", KEYS[3])
-if isbusy then
-	return nil
-else
-	redis.call("set", KEYS[3], "true", "px", ${BusyTimeout})
+local sid = redis.call("xadd", KEYS[2], "*", "commit", ARGV[1])
+if sid then
+	redis.call("set", KEYS[3], sid, "px", ${BusyTimeout})
+	redis.call("publish", KEYS[1], sid)
 
-	local sid = redis.call("xadd", KEYS[2], "*", "commit", ARGV[1])
-	if sid then
-		redis.call("publish", KEYS[1], sid)
-
-		local cnt = 0
-		local expire = redis.call("xrange", KEYS[2], "-", ARGV[2])
-		for i = 1, #expire do
-			cnt = cnt + redis.call("xdel", KEYS[2], expire[i][1])
-		end
-
-		return sid
-	else
-		return redis.error_reply("[CommitStore] error writing commit")
+	local cnt = 0
+	local expire = redis.call("xrange", KEYS[2], "-", ARGV[2])
+	for i = 1, #expire do
+		cnt = cnt + redis.call("xdel", KEYS[2], expire[i][1])
 	end
+
+	return sid
+else
+	return redis.error_reply("[CommitStore] error writing commit")
 end`;
 
-export const CommitStore = (client: Redis, ttl?: number) => {
+export type CommitStore = {
+	put: (commit: Commit) => Promise<Commit>,
+	get: (args?: { id?: string; from?: string; to?: string}) => Promise<Commit[]>
+};
+
+export const getCommitStore = (channel: string, client: Redis, ttl?: number): CommitStore => {
 	const _ttl = ttl ? ttl : 86400000; // 1 day == 24x60x60x1000 milliseconds
 	return {
-		put: (channel: string, commit: Commit): Promise<Commit> => {
+		put: (commit: Commit): Promise<Commit> => {
 			return new Promise<Commit>(async (resolve, reject) => {
 				const timestamp = Date.now();
 				const offset = '' + (timestamp - _ttl);
@@ -116,7 +124,7 @@ export const CommitStore = (client: Redis, ttl?: number) => {
 				}
 			});
 		},
-		get: (channel: string, args?: {
+		get: (args?: {
 			id?: string;
 			from?: string;
 			to?: string;
@@ -130,7 +138,7 @@ export const CommitStore = (client: Redis, ttl?: number) => {
 					await client.xrange(key1, from ? from : '-', to ? to : '+');
 				if (results.length > 0) {
 					try {
-						resolve(toCommits('[CommitStore]', results.map(result => [result[0][0], result[0][1][1]])));
+						resolve(toCommits('[CommitStore]', results.map(result => [result[0], result[1][1]])));
 					} catch (error) {
 						reject(error);
 					}
