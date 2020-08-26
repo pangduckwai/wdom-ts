@@ -124,7 +124,6 @@ export const getSubscriptions = (
 					retry --;
 					await new Promise((resolve) => setTimeout(() => resolve(), 100));
 				}
-				if (retry < 5) console.log('SUBSCRIPTION BUSY', retry); // TODO TEMP
 
 				if (subscribers[channel].busy)
 					reject(new Error('Subscription still busy...'));

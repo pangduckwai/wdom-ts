@@ -1,6 +1,6 @@
 import { Redis } from 'ioredis';
 import { deserialize } from '..';
-import { Game, Player, isGame, isPlayer } from '.';
+import { Game, Player, isGame, isPlayer, Status } from '.';
 
 // KEYS[1]  - Player snapshots
 // KEYS[2]  - Game snapshots
@@ -10,6 +10,9 @@ import { Game, Player, isGame, isPlayer } from '.';
 const take = `
 local next = ARGV[1] + 2
 local count = 0
+
+redis.call("del", KEYS[1])
+redis.call("del", KEYS[2])
 
 for i = 2, ARGV[1], 2 do
 	if redis.call("hset", KEYS[1], ARGV[i], ARGV[i+1]) >= 0 then
@@ -62,8 +65,8 @@ export const getSnapshot = (
 			games: Record<string, Game>
 		}): Promise<number> => {
 			return new Promise<number>(async (resolve, reject) => {
-				const playerList = Object.values(players);
-				const gameList = Object.values(games);
+				const playerList = Object.values(players).filter(p => p.status !== Status.Deleted);
+				const gameList = Object.values(games).filter(g => g.status !== Status.Deleted);
 				const args = [
 					`${channel}:Player`,
 					`${channel}:Game`,
@@ -110,7 +113,6 @@ export const getSnapshot = (
 					await new Promise((resolve) => setTimeout(() => resolve(), 100));
 					result = await client.eval(read, 3, [`${channel}:Player`, `${channel}:Game`, `${channel}:Busy`]);
 				}
-				if (retry < 5) console.log('SNAPSHOT BUSY', retry); // TODO TEMP
 
 				if (!result) {
 					reject(new Error('Snapshot still busy...'));
