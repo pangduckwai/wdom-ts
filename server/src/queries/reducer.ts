@@ -1,5 +1,5 @@
-import { Commit, createCommit } from '../commands';
-import { generateToken, TurnEnded } from '..';
+import { Commit } from '../commands';
+import { generateToken } from '..';
 import { Card, rules, _shuffle, Territories, WildCards, Territory, Continents, Continent } from '../rules';
 import { buildMessage, Game, Message, MessageType, Player, Status } from '.';
 
@@ -25,17 +25,19 @@ enum Expected {
 
 const validator = (
 	map: Record<Territories, Territory>,
+	deck: Record<Territories | WildCards, Card>,
 	players: Record<string, Player>,
 	games: Record<string, Game>,
 ) => {
 	return ({
-		playerToken, playerToken2, gameToken, territory, territory2, expectedStage
+		playerToken, playerToken2, gameToken, territory, territory2, cards, expectedStage
 	}: {
 		playerToken?: string;
 		playerToken2?: string;
 		gameToken?: string;
 		territory?: string;
 		territory2?: string;
+		cards?: string[];
 		expectedStage?: { expected: Expected, stage: GameStage; };
 	}) => {
 		if (playerToken && !players[playerToken]) return `Player "${playerToken}" not found`;
@@ -45,6 +47,11 @@ const validator = (
 		if (territory && territory2) {
 			if (!map[territory as Territories].connected.has(territory2 as Territories))
 				return `Territories "${territory}" and "${territory2}" are not connected`;
+		}
+		if (cards) {
+			for (const card of cards) {
+				if (!deck[card as Territories | WildCards]) return `Invalid card "${card}"`;
+			}
 		}
 
 		if (gameToken) {
@@ -132,7 +139,7 @@ export const reducer = (
 		const messages: Message[] = []; // Message to the client (mainly error messages)
 
 		return incoming.reduce(({ players, games, messages }, commit) => {
-			const validate = validator(map, players, games);
+			const validate = validator(map, deck, players, games);
 			let error: string | undefined;
 			for (const event of commit.events) {
 				switch (event.type) {
@@ -221,9 +228,10 @@ export const reducer = (
 
 					case 'GameJoined':
 						error = validate({
-							playerToken: event.payload.playerToken, gameToken: event.payload.gameToken, expectedStage: {
-								expected: Expected.OnOrBefore, stage: GameStage.GameOpened
-						}});
+							playerToken: event.payload.playerToken,
+							gameToken: event.payload.gameToken,
+							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
+						});
 						if (!error) {
 							if (games[event.payload.gameToken].host === event.payload.playerToken) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You already in your own game`));
@@ -251,6 +259,91 @@ export const reducer = (
 							} else {
 								players[event.payload.playerToken].joined = undefined;
 								games[joinedToken].players = games[joinedToken].players.filter(p => p !== event.payload.playerToken);
+							}
+						} else {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+						}
+						break;
+
+					case 'PlayerShuffled':
+						error = validate({
+							playerToken: event.payload.playerToken,
+							gameToken: event.payload.gameToken,
+							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
+						});
+						if (!error) {
+							const joinedToken = players[event.payload.playerToken].joined;
+							if (!joinedToken) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not in any game currently`));
+							} else if (games[joinedToken].host !== event.payload.playerToken) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not the host of this game`));
+							} else if (games[event.payload.gameToken].players.length < rules.MinPlayerPerGame) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Not enough players in the game "${games[event.payload.gameToken].name}" yet`));
+							} else {
+								games[event.payload.gameToken].players = event.payload.players;
+							}
+						} else {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+						}
+						break;
+
+					case 'TerritoryAssigned':
+						error = validate({
+							gameToken: event.payload.gameToken,
+							territory: event.payload.territoryName,
+							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
+						});
+						if (!error) {
+							const playerLen = games[event.payload.gameToken].players.length;
+							if (games[event.payload.gameToken].turns >= playerLen) {
+								games[event.payload.gameToken].turns = playerLen - 1; // Possibily someone just quit game
+							} else if (games[event.payload.gameToken].players.length < rules.MinPlayerPerGame) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Not enough players in the game "${games[event.payload.gameToken].name}" yet`));
+							} else {
+								const playerToken = games[event.payload.gameToken].players[games[event.payload.gameToken].turns];
+								const player = players[playerToken];
+								const territory = map[event.payload.territoryName as Territories];
+								player.holdings[territory.name] = territory;
+								player.holdings[territory.name].troop = 1;
+								games[event.payload.gameToken].turns ++;
+								if (games[event.payload.gameToken].turns >= playerLen) games[event.payload.gameToken].turns = 0;
+							}
+						} else {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+						}
+						break;
+
+					case 'CardReturned':
+						error = validate({
+							gameToken: event.payload.gameToken,
+							cards: [event.payload.cardName],
+							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
+						});
+						if (!error) {
+							games[event.payload.gameToken].cards.push(deck[event.payload.cardName as Territories | WildCards]);
+						} else {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+						}
+						break;
+
+					case 'GameStarted':
+						error = validate({
+							playerToken: event.payload.playerToken,
+							gameToken: event.payload.gameToken,
+							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
+						});
+						if (!error) {
+							const joinedToken = players[event.payload.playerToken].joined;
+							if (!joinedToken) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not in any game currently`));
+							} else if (games[joinedToken].host !== event.payload.playerToken) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not the host of this game`));
+							} else if (games[event.payload.gameToken].players.length < rules.MinPlayerPerGame) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Not enough players in the game "${games[event.payload.gameToken].name}" yet`));
+							} else {
+								games[event.payload.gameToken].status = Status.Ready;
+								games[event.payload.gameToken].round = 0;
+								games[event.payload.gameToken].turns = 0; // First player start game setup
 							}
 						} else {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));

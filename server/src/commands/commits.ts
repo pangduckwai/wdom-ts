@@ -1,8 +1,6 @@
 import { Redis } from 'ioredis';
-import { BaseEvent, deserialize, generateToken } from '..';
-import { BusyTimeout } from '.';
-import { resolve } from 'path';
-import { rejects } from 'assert';
+import { deserialize } from '..';
+import { BaseEvent, BusyTimeout } from '.';
 
 export interface Commit {
 	id: string;

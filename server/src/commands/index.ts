@@ -1,9 +1,10 @@
 import { Redis } from 'ioredis';
 
+export * from './events';
 export * from './commands';
 export * from './commits';
-// export * from './schema';
-// export * from './service';
+export * from './schema';
+export * from './service';
 
 export const BusyTimeout = 900;
 

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 
 // export * from './data-src';
-export * from './events';
+// export * from './events';
 
 export const CHANNEL = `wdom${Date.now()}`;
 

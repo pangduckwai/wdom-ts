@@ -72,7 +72,7 @@ let reports: {
 beforeAll(async () => {
 	publisher = new RedisClient({ host, port });
 	subscriber = new RedisClient({ host, port });
-	commands = getCommands(getCommitStore(channel, publisher));
+	commands = getCommands(channel, publisher);
 	snapshot = getSnapshot(channel, publisher);
 	subscriptions = getSubscriptions(publisher, world, map, deck);
 	reports = {
@@ -118,9 +118,7 @@ describe('Integration tests', () => {
 			await commands.RegisterPlayer({ playerName: playerName });
 		}
 		const { players, games } = await snapshot.read();
-		reports.messages = await subscriptions.report(channel);
-		reports.players = players;
-		reports.games = games;
+		reports = { players, games, messages: await subscriptions.report(channel) };
 		expect(Object.values(players).map(p => p.name).sort()).toEqual(playerNames.sort());
 	});
 
@@ -129,27 +127,21 @@ describe('Integration tests', () => {
 			await commands.PlayerLeave({ playerToken: player.token });
 		}
 		const { players, games } = await snapshot.read();
-		reports.messages = await subscriptions.report(channel);
-		reports.players = players;
-		reports.games = games;
+		reports = { players, games, messages: await subscriptions.report(channel) };
 		expect(Object.values(reports.players).filter(p => p.name === 'bill' || p.name === 'dave').length).toEqual(0);
 	});
 
 	it('add duplicated player name', async () => {
 		await commands.RegisterPlayer({ playerName: 'josh' });
 		const { players, games } = await snapshot.read();
-		reports.messages = await subscriptions.report(channel);
-		reports.players = players;
-		reports.games = games;
+		reports = { players, games, messages: await subscriptions.report(channel) };
 		expect(reports.messages.filter(m => m.message === 'Player "josh" already registered').length).toEqual(1);
 	});
 
 	it('non-existing player leave', async () => {
 		await commands.PlayerLeave({ playerToken: '1234567890' });
 		const { players, games } = await snapshot.read();
-		reports.messages = await subscriptions.report(channel);
-		reports.players = players;
-		reports.games = games;
+		reports = { players, games, messages: await subscriptions.report(channel) };
 		expect(reports.messages.filter(m => m.message === 'Player "1234567890" not found').length).toEqual(1);
 	});
 
@@ -160,9 +152,7 @@ describe('Integration tests', () => {
 			await commands.OpenGame({ playerToken, gameName });
 		}
 		const { players, games } = await snapshot.read();
-		reports.messages = await subscriptions.report(channel);
-		reports.players = players;
-		reports.games = games;
+		reports = { players, games, messages: await subscriptions.report(channel) };
 		expect(Object.values(reports.games).map(g => g.name).sort()).toEqual(Object.keys(gameHosts).map(n => `${n}'s game`).sort());
 	});
 
@@ -176,9 +166,7 @@ describe('Integration tests', () => {
 			}
 		}
 		const { players, games } = await snapshot.read();
-		reports.messages = await subscriptions.report(channel);
-		reports.players = players;
-		reports.games = games;
+		reports = { players, games, messages: await subscriptions.report(channel) };
 		for (const hostName of Object.keys(gameHosts)) {
 			const hostToken = Object.values(reports.players).filter(p => p.name === hostName)[0].token;
 			expect(
@@ -197,119 +185,117 @@ describe('Integration tests', () => {
 		const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
 		await commands.JoinGame({ playerToken, gameToken });
 		const { players, games } = await snapshot.read();
-		reports.messages = await subscriptions.report(channel);
-		reports.players = players;
-		reports.games = games;
+		reports = { players, games, messages: await subscriptions.report(channel) };
 		expect(reports.messages.filter(m => m.message === 'You already in your own game').length).toEqual(1);
 	});
 
-// 	it('player close game', async () => {
-// 		const playerToken = Object.values(reports.players).filter(p => p.name === 'saul')[0].token;
-// 		await commitStore.put(channel, Commands.CloseGame({ playerToken }));
-// 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-// 		reports = await subscriptions.report(channel);
-// 		expect(Object.values(reports.games).filter(g => g.status === 0).map(g => g.name)).toEqual(['saul\'s game']);
-// 		expect(Object.values(reports.players)
-// 			.filter(p => (p.name === 'saul') || (p.name === 'nick') || (p.name === 'mike') || (p.name === 'john'))
-// 			.filter(p => !p.joined).length).toEqual(4);
-// 	});
+	it('player close game', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'saul')[0].token;
+		await commands.CloseGame({ playerToken });
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(Object.values(reports.games).filter(g => g.name === 'saul\'s game').length).toEqual(0);
+		expect(Object.values(reports.players)
+			.filter(p => (p.name === 'saul') || (p.name === 'nick') || (p.name === 'mike') || (p.name === 'john'))
+			.filter(p => !p.joined).length).toEqual(4);
+	});
 
-// 	it('non-host player try to close a game', async () => {
-// 		const playerToken = Object.values(reports.players).filter(p => p.name === 'matt')[0].token;
-// 		await commitStore.put(channel, Commands.CloseGame({ playerToken }));
-// 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-// 		reports = await subscriptions.report(channel);
-// 		expect(reports.messages.filter(m => m.message === 'Player matt is not hosting any game').length).toEqual(1);
-// 	});
+	it('non-host player try to close a game', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'matt')[0].token;
+		await commands.CloseGame({ playerToken });
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.messages.filter(m => m.message === 'Player "matt" is not hosting any game').length).toEqual(1);
+	});
 
-// 	it('players join another game', async () => {
-// 		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
-// 		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
-// 		const names = [...gameHosts['saul'], 'saul'];
-// 		for (const playerName of names) {
-// 			const playerToken = Object.values(reports.players).filter(p => p.name === playerName)[0].token;
-// 			await commitStore.put(channel, Commands.JoinGame({ playerToken, gameToken }));
-// 		}
-// 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-// 		reports = await subscriptions.report(channel);
-// 		expect(
-// 			Object.values(reports.games)
-// 				.filter(g => g.host === hostToken)[0]
-// 				.players
-// 				.map(p => reports.players[p].name)
-// 				.sort())
-// 			.toEqual([...names, 'matt', 'josh'].sort());
-// 	});
+	it('players join another game', async () => {
+		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+		const names = [...gameHosts['saul'], 'saul'];
+		for (const playerName of names) {
+			const playerToken = Object.values(reports.players).filter(p => p.name === playerName)[0].token;
+			await commands.JoinGame({ playerToken, gameToken });
+		}
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(
+			Object.values(reports.games)
+				.filter(g => g.host === hostToken)[0]
+				.players
+				.map(p => reports.players[p].name)
+				.sort())
+			.toEqual([...names, 'matt', 'josh'].sort());
+	});
 
-// 	it('try to start a game with too few players', async () => {
-// 		const playerToken = Object.values(reports.players).filter(p => p.name === 'pete')[0].token;
-// 		const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
-// 		await commitStore.put(channel, Commands.StartGame({ playerToken, gameToken }));
-// 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-// 		reports = await subscriptions.report(channel);
-// 		expect(reports.messages.filter(m => m.message === 'Not enough players in the game pete\'s game yet').length).toEqual(1);
-// 	});
+	it('try to start a game with too few players', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'pete')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
+		await commands.StartGame({ playerToken, gameToken });
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.messages.filter(m => m.message === 'Not enough players in the game "pete\'s game" yet').length).toEqual(44);
+	});
 
-// 	it('player quit a game', async () => {
-// 		const playerToken = Object.values(reports.players).filter(p => p.name === 'jess')[0].token;
-// 		await commitStore.put(channel, Commands.QuitGame({ playerToken }));
-// 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-// 		reports = await subscriptions.report(channel);
-// 		expect(reports.players[playerToken].joined).toBeUndefined();
-// 	});
+	it('player quit a game', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'jess')[0].token;
+		await commands.QuitGame({ playerToken });
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.players[playerToken].joined).toBeUndefined();
+	});
 
-// 	it('player try to quit his own game', async () => {
-// 		const playerToken = Object.values(reports.players).filter(p => p.name === 'pete')[0].token;
-// 		await commitStore.put(channel, Commands.QuitGame({ playerToken }));
-// 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-// 		reports = await subscriptions.report(channel);
-// 		expect(reports.messages.filter(m => m.message === 'You cannot quit your own game').length).toEqual(1);
-// 	});
+	it('player try to quit his own game', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'pete')[0].token;
+		await commands.QuitGame({ playerToken });
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.messages.filter(m => m.message === 'You cannot quit the game you are hosting').length).toEqual(1);
+	});
 
-// 	it('player not in a game try to quit game', async () => {
-// 		const playerToken = Object.values(reports.players).filter(p => p.name === 'dick')[0].token;
-// 		await commitStore.put(channel, Commands.QuitGame({ playerToken }));
-// 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-// 		reports = await subscriptions.report(channel);
-// 		expect(reports.messages.filter(m => m.message === 'You are not in any game currently').length).toEqual(1);
-// 	});
+	it('player not in a game try to quit game', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'dick')[0].token;
+		await commands.QuitGame({ playerToken });
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.messages.filter(m => m.message === 'You are not in any game currently').length).toEqual(1);
+	});
 
-// 	it('non-host player try to start a game', async () => {
-// 		const playerToken = Object.values(reports.players).filter(p => p.name === 'matt')[0].token;
-// 		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
-// 		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
-// 		await commitStore.put(channel, Commands.StartGame({ playerToken, gameToken }));
-// 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-// 		reports = await subscriptions.report(channel);
-// 		expect(reports.messages.filter(m => m.message === 'You can only start your own game').length).toEqual(1);
-// 	});
+	it('non-host player try to start a game', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'matt')[0].token;
+		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+		await commands.StartGame({ playerToken, gameToken });
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.messages.filter(m => m.message === 'You are not the host of this game').length).toEqual(2);
+	});
 
-// 	it('player try to join a full game', async () => {
-// 		const playerToken = Object.values(reports.players).filter(p => p.name === 'jess')[0].token;
-// 		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
-// 		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
-// 		await commitStore.put(channel, Commands.JoinGame({ playerToken, gameToken }));
-// 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-// 		reports = await subscriptions.report(channel);
-// 		expect(reports.messages.filter(m => m.message === 'Game josh\'s game already full').length).toEqual(1);
-// 	});
+	it('player try to join a full game', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'jess')[0].token;
+		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+		await commands.JoinGame({ playerToken, gameToken });
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.messages.filter(m => m.message === 'Game "josh\'s game" already full').length).toEqual(1);
+	});
 
-// 	it('player start a game', async () => {
-// 		const playerToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
-// 		const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
-// 		await commitStore.put(channel, Commands.StartGame({ playerToken, gameToken }));
-// 		await new Promise((resolve) => setTimeout(() => resolve(), 200));
-// 		reports = await subscriptions.report(channel);
+	// it('player start a game', async () => {
+	// 	const playerToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+	// 	const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
+	// 	await commands.StartGame({ playerToken, gameToken });
+	// 	const { players, games } = await snapshot.read();
+	// 	reports = { players, games, messages: await subscriptions.report(channel) };
 
-// 		const cards = reports.games[gameToken].cards.map(c => c.name);
-// 		expect(cards.length).toEqual(44);
-// 		expect(cards[42]).toEqual('Wildcard-2');
+	// 	const cards = reports.games[gameToken].cards.map(c => c.name);
+	// 	expect(cards.length).toEqual(44);
+	// 	expect(cards[42]).toEqual('Wildcard-2');
 
-// 		const holdings = reports.players[playerToken].holdings;
-// 		expect(Object.keys(holdings).length).toEqual(7);
-// 		expect(Object.values(holdings).map(t => t.name)[3]).toEqual('Great-Britain');
-// 		expect(reports.games[gameToken].status).toEqual(2);
-// 		expect(reports.players[playerToken].reinforcement).toEqual(rules.initialTroops(6) - Object.keys(reports.players[playerToken].holdings).length);
-// 	});
+	// 	const holdings = reports.players[playerToken].holdings;
+	// 	expect(Object.keys(holdings).length).toEqual(7);
+	// 	expect(Object.values(holdings).map(t => t.name)[3]).toEqual('Great-Britain');
+	// 	expect(reports.games[gameToken].status).toEqual(2);
+	// 	expect(reports.players[playerToken].reinforcement).toEqual(rules.initialTroops(6) - Object.keys(reports.players[playerToken].holdings).length);
+	// });
 
 });

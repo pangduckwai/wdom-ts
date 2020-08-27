@@ -112,9 +112,15 @@ export const getSubscriptions = (
 		},
 		stop: async (channel: string) => {
 			subscribers[channel].subscribe$?.unsubscribe();
-			await subscribers[channel].subscriber.unsubscribe(channel);
+
+			await subscribers[channel].subscriber.unsubscribe(channel)
+				.catch(error => console.log(`Error unsubscribing from redis: ${error}`));
+
 			subscribers[channel].ready = false;
-			await subscribers[channel].subscriber.quit();
+
+			await subscribers[channel].subscriber.quit()
+				.catch(error => console.log(`Error closing redis subscription client: ${error}`));
+
 			delete subscribers[channel];
 		},
 		report: async (channel: string) => {

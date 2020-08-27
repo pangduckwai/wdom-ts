@@ -49,6 +49,18 @@ export interface GameQuitted extends BaseEvent {
 		playerToken: string;
 	}
 }
+// ************************
+
+// ************************
+// *** Game play Events ***
+export interface PlayerShuffled extends BaseEvent {
+	readonly type: 'PlayerShuffled';
+	payload: {
+		playerToken: string;
+		gameToken: string;
+		players: string[];
+	}
+}
 
 export interface GameStarted extends BaseEvent {
 	readonly type: 'GameStarted';
@@ -57,16 +69,13 @@ export interface GameStarted extends BaseEvent {
 		gameToken: string;
 	}
 }
-// ************************
 
-// ************************
-// *** Game play Events ***
-export interface SetupBegun extends BaseEvent {
-	readonly type: 'SetupBegun';
-	payload: {
-		gameToken: string;
-	}
-}
+// export interface SetupBegun extends BaseEvent {
+// 	readonly type: 'SetupBegun';
+// 	payload: {
+// 		gameToken: string;
+// 	}
+// }
 
 // export interface SetupFinished extends BaseEvent {
 // 	readonly type: 'SetupFinished';

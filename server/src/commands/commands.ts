@@ -1,13 +1,14 @@
 import { Redis } from 'ioredis';
+import { getSnapshot } from '../queries';
 import { _shuffle, Territories, WildCards } from '../rules';
 import {
+	Commit, CommitStore, createCommit, getCommitStore,
 	PlayerRegistered, PlayerLeft,
-	GameOpened, GameClosed, GameJoined, GameQuitted, GameStarted,
-	SetupBegun, TerritoryAssigned, TerritoryAttacked,
+	GameOpened, GameClosed, GameJoined, GameQuitted, PlayerShuffled,
+	GameStarted, TerritoryAssigned, TerritoryAttacked,
 	TerritoryFortified, TerritorySelected, TroopPlaced,
 	TurnEnded, CardReturned, CardsRedeemed, PlayerDefeated, GameWon
-} from '..';
-import { Commit, createCommit } from '.';
+} from '.';
 
 export type Commands = {
 	RegisterPlayer: (payload: { playerName: string }) => Promise<Commit>,
@@ -19,10 +20,10 @@ export type Commands = {
 	StartGame: (payload: { playerToken: string; gameToken: string }) => Promise<Commit>,
 };
 
-export const getCommands = (commitStore: {
-	put: (commit: Commit) => Promise<Commit>,
-	get: (args?: { id?: string; from?: string; to?: string}) => Promise<Commit[]>
-}) => {
+export const getCommands = (channel: string, client: Redis) => {
+	const commitStore: CommitStore = getCommitStore(channel, client);
+	const snapshot = getSnapshot(channel, client);
+
 	return {
 		RegisterPlayer: (payload: { playerName: string }) =>
 			createCommit().addEvent<PlayerRegistered>({
@@ -54,10 +55,16 @@ export const getCommands = (commitStore: {
 				type: 'GameQuitted',
 				payload
 			}).build(commitStore),
-		StartGame: (payload: { playerToken: string; gameToken: string }) => {
-			const { build, addEvent } = createCommit().addEvent<GameStarted>({
-				type: 'GameStarted',
-				payload
+		StartGame: async (payload: { playerToken: string; gameToken: string }) => {
+			const { players, games } = await snapshot.read();
+			const tokens: string[] = _shuffle(games[payload.gameToken].players);
+			// Need to do these here because need to record player orders, territory assigned, and cards, in a event, otherwise cannot replay
+			const { build, addEvent } = createCommit().addEvent<PlayerShuffled>({
+				type: 'PlayerShuffled',
+				payload: {
+					...payload,
+					players: tokens
+				}
 			});
 			for (const territoryName of _shuffle(Territories.map(t => t))) {
 				addEvent<TerritoryAssigned>({
@@ -65,19 +72,15 @@ export const getCommands = (commitStore: {
 					payload: { gameToken: payload.gameToken, territoryName }
 				});
 			}
-			for (const card of _shuffle([...WildCards, ...Territories])) { // Need to do it here because need to record each card in a event, otherwise cannot replay
+			for (const cardName of _shuffle([...WildCards, ...Territories])) {
 				addEvent<CardReturned>({
 					type: 'CardReturned',
-					payload: { gameToken: payload.gameToken, cardName: card }
+					payload: { gameToken: payload.gameToken, cardName }
 				});
 			}
-			// addEvent<ReinforcementArrived>({
-			// 	type: 'ReinforcementArrived',
-			// 	payload: { gameToken: payload.gameToken }
-			// });
-			addEvent<SetupBegun>({
-				type: 'SetupBegun',
-				payload: { gameToken: payload.gameToken }
+			addEvent<GameStarted>({
+				type: 'GameStarted',
+				payload
 			});
 			return build(commitStore);
 		},
