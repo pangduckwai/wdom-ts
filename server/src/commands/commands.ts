@@ -5,9 +5,10 @@ import {
 	Commit, CommitStore, createCommit, getCommitStore,
 	PlayerRegistered, PlayerLeft,
 	GameOpened, GameClosed, GameJoined, GameQuitted, PlayerShuffled,
-	GameStarted, TerritoryAssigned, TerritoryAttacked,
-	TerritoryFortified, TerritorySelected, TroopPlaced,
-	TurnEnded, CardReturned, CardsRedeemed, PlayerDefeated, GameWon
+	GameStarted, TerritoryAssigned, MoveMade,
+	// TerritoryAttacked, TerritoryFortified, TerritorySelected, TroopPlaced, TurnEnded,
+	CardReturned,
+	// CardsRedeemed, PlayerDefeated, GameWon
 } from '.';
 
 export type Commands = {
@@ -69,13 +70,13 @@ export const getCommands = (channel: string, client: Redis) => {
 			for (const territoryName of _shuffle(Territories.map(t => t))) {
 				addEvent<TerritoryAssigned>({
 					type: 'TerritoryAssigned',
-					payload: { gameToken: payload.gameToken, territoryName }
+					payload: { ...payload, territoryName }
 				});
 			}
 			for (const cardName of _shuffle([...WildCards, ...Territories])) {
 				addEvent<CardReturned>({
 					type: 'CardReturned',
-					payload: { gameToken: payload.gameToken, cardName }
+					payload: { ...payload, cardName }
 				});
 			}
 			addEvent<GameStarted>({
@@ -89,9 +90,14 @@ export const getCommands = (channel: string, client: Redis) => {
 		// 		type: 'SetupFinished',
 		// 		payload
 		// 	}).build(commitStore),
-		// MakeMove: (payload: { playerToken: string; gameToken: string; territoryName: string; flag: number }) =>
-		// 	createCommit().addEvent<MoveMade>({
-		// 		type: 'MoveMade',
+		MakeMove: (payload: { playerToken: string; gameToken: string; territoryName: string; flag: number }) =>
+			createCommit().addEvent<MoveMade>({
+				type: 'MoveMade',
+				payload
+			}).build(commitStore),
+		// PlaceTroop: (payload: { playerToken: string; gameToken: string; territoryName: string; amount: number }) => {
+		// 	return createCommit().addEvent<TroopPlaced>({
+		// 		type: 'TroopPlaced',
 		// 		payload
 		// 	}).addEvent<TerritorySelected>({
 		// 		type: 'TerritorySelected',
@@ -100,40 +106,28 @@ export const getCommands = (channel: string, client: Redis) => {
 		// 			gameToken: payload.gameToken,
 		// 			territoryName: payload.territoryName
 		// 		}
+		// 	}).build(commitStore);
+		// },
+		// AttackTerritory: (payload: {
+		// 	fromPlayer: string;
+		// 	toPlayer: string;
+		// 	gameToken: string;
+		// 	fromTerritory: string;
+		// 	toTerritory: string;
+		// 	attackerLoss: number;
+		// 	defenderLoss: number;
+		// }) =>
+		// 	createCommit().addEvent<TerritoryAttacked>({
+		// 		type: 'TerritoryAttacked',
+		// 		payload
+		// 	}).addEvent<TerritorySelected>({
+		// 		type: 'TerritorySelected',
+		// 		payload: {
+		// 			playerToken: payload.fromPlayer,
+		// 			gameToken: payload.gameToken,
+		// 			territoryName: payload.toTerritory
+		// 		}
 		// 	}).build(commitStore),
-		PlaceTroop: (payload: { playerToken: string; gameToken: string; territoryName: string; amount: number }) => {
-			return createCommit().addEvent<TroopPlaced>({
-				type: 'TroopPlaced',
-				payload
-			}).addEvent<TerritorySelected>({
-				type: 'TerritorySelected',
-				payload: {
-					playerToken: payload.playerToken,
-					gameToken: payload.gameToken,
-					territoryName: payload.territoryName
-				}
-			}).build(commitStore);
-		},
-		AttackTerritory: (payload: {
-			fromPlayer: string;
-			toPlayer: string;
-			gameToken: string;
-			fromTerritory: string;
-			toTerritory: string;
-			attackerLoss: number;
-			defenderLoss: number;
-		}) =>
-			createCommit().addEvent<TerritoryAttacked>({
-				type: 'TerritoryAttacked',
-				payload
-			}).addEvent<TerritorySelected>({
-				type: 'TerritorySelected',
-				payload: {
-					playerToken: payload.fromPlayer,
-					gameToken: payload.gameToken,
-					territoryName: payload.toTerritory
-				}
-			}).build(commitStore),
 		// ConquerTerritory: (payload: {
 		// 	fromPlayer: string;
 		// 	toPlayer: string;
@@ -145,45 +139,45 @@ export const getCommands = (channel: string, client: Redis) => {
 		// 		type: 'TerritoryConquered',
 		// 		payload
 		// 	}).build(commitStore),
-		Fortify: (payload: {
-			playerToken: string;
-			gameToken: string;
-			fromTerritory: string;
-			toTerritory: string;
-			amount: number;
-		}) =>
-			createCommit().addEvent<TerritoryFortified>({
-				type: 'TerritoryFortified',
-				payload
-			}).build(commitStore),
-		DefeatPlayer: (payload: { fromPlayer: string; toPlayer: string; gameToken: string }) =>
-			createCommit().addEvent<PlayerDefeated>({
-				type: 'PlayerDefeated',
-				payload
-			}).build(commitStore),
-		EndTurn: (payload: { playerToken: string; gameToken: string }) =>
-			createCommit().addEvent<TurnEnded>({
-				type: 'TurnEnded',
-				payload
-			}).build(commitStore),
-		RedeemCards: (payload: { playerToken: string; gameToken: string; cardNames: string[] }) => {
-			const { build, addEvent } = createCommit().addEvent<CardsRedeemed>({
-				type: 'CardsRedeemed',
-				payload
-			});
-			for (const card of payload.cardNames) {
-				addEvent<CardReturned>({
-					type: 'CardReturned',
-					payload: { gameToken: payload.gameToken, cardName: card }
-				});
-			}
-			return build(commitStore);
-		},
-		WinGame: (payload: { playerToken: string; gameToken: string }) =>
-			createCommit().addEvent<GameWon>({
-				type: 'GameWon',
-				payload
-			}).build(commitStore),
+		// Fortify: (payload: {
+		// 	playerToken: string;
+		// 	gameToken: string;
+		// 	fromTerritory: string;
+		// 	toTerritory: string;
+		// 	amount: number;
+		// }) =>
+		// 	createCommit().addEvent<TerritoryFortified>({
+		// 		type: 'TerritoryFortified',
+		// 		payload
+		// 	}).build(commitStore),
+		// DefeatPlayer: (payload: { fromPlayer: string; toPlayer: string; gameToken: string }) =>
+		// 	createCommit().addEvent<PlayerDefeated>({
+		// 		type: 'PlayerDefeated',
+		// 		payload
+		// 	}).build(commitStore),
+		// EndTurn: (payload: { playerToken: string; gameToken: string }) =>
+		// 	createCommit().addEvent<TurnEnded>({
+		// 		type: 'TurnEnded',
+		// 		payload
+		// 	}).build(commitStore),
+		// RedeemCards: (payload: { playerToken: string; gameToken: string; cardNames: string[] }) => {
+		// 	const { build, addEvent } = createCommit().addEvent<CardsRedeemed>({
+		// 		type: 'CardsRedeemed',
+		// 		payload
+		// 	});
+		// 	for (const card of payload.cardNames) {
+		// 		addEvent<CardReturned>({
+		// 			type: 'CardReturned',
+		// 			payload: { playerToken: payload.playerToken, gameToken: payload.gameToken, cardName: card }
+		// 		});
+		// 	}
+		// 	return build(commitStore);
+		// },
+		// WinGame: (payload: { playerToken: string; gameToken: string }) =>
+		// 	createCommit().addEvent<GameWon>({
+		// 		type: 'GameWon',
+		// 		payload
+		// 	}).build(commitStore),
 		// NextPlayer: (payload: { fromPlayer: string; toPlayer: string; gameToken: string }) =>
 		// 	createCommit().addEvent<NextPlayer>({
 		// 		type: 'NextPlayer',

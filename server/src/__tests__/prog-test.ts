@@ -133,7 +133,7 @@ describe('Programming behaviour tests', () => {
 			const card = list.pop();
 			if (card) player.cards[card.name] = card;
 		}
-		const type = player.cards['Middle-East'].type;
+		const type = player.cards['Western-United-States'].type;
 		expect(type).toEqual(1);
 	});
 
@@ -155,7 +155,7 @@ describe('Programming behaviour tests', () => {
 		const s = Territories.map(t => t);
 		const t = _shuffle(s);
 		console.log('const assertion', t);
-		expect(t[29]).toEqual('China');
+		expect(t[29]).toEqual('Siberia');
 	});
 
 	it('test const assertion again', () => {

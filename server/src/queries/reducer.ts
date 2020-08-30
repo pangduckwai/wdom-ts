@@ -2,6 +2,7 @@ import { Commit } from '../commands';
 import { generateToken } from '..';
 import { Card, rules, _shuffle, Territories, WildCards, Territory, Continents, Continent } from '../rules';
 import { buildMessage, Game, Message, MessageType, Player, Status } from '.';
+import { join } from 'path';
 
 /**
  * The stages are Opened (-2), Started (-1), GameSetup (0), TurnSetup (>0), GamePlay(>0), the 'before' and 'after' modifiers are for
@@ -30,10 +31,11 @@ const validator = (
 	games: Record<string, Game>,
 ) => {
 	return ({
-		playerToken, playerToken2, gameToken, territory, territory2, cards, expectedStage
+		playerToken, playerToken2, hostToken, gameToken, territory, territory2, cards, expectedStage
 	}: {
 		playerToken?: string;
 		playerToken2?: string;
+		hostToken?: string;
 		gameToken?: string;
 		territory?: string;
 		territory2?: string;
@@ -42,6 +44,7 @@ const validator = (
 	}) => {
 		if (playerToken && !players[playerToken]) return `Player "${playerToken}" not found`;
 		if (playerToken2 && !players[playerToken2]) return `Player "${playerToken2}" not found`;
+		if (hostToken && !players[hostToken]) return `Player "${hostToken}" not found`;
 		if (territory && !map[territory as Territories]) return `Unknown territory "${territory}"`;
 		if (territory2 && !map[territory2 as Territories]) return `Unknown territory "${territory2}"`;
 		if (territory && territory2) {
@@ -59,13 +62,19 @@ const validator = (
 			const player = playerToken ? players[playerToken] : null;
 
 			if (!game) return `Game "${gameToken}" not found`;
-			if (playerToken) {
+
+			if ((hostToken) && (game.host !== hostToken))
+				return `Player "${players[hostToken].name}" is not the host of game "${game.name}"`;
+
+			if (player) {
 				if (game.round >= 0) {
 					// Players already join games
 					if (game.players.filter(k => k === playerToken).length <= 0)
-						return `Player "${player?.name}" not in game "${game.name}"`;
+						return `Player "${player.name}" not found in game "${game.name}"`;
+					if (!player.joined || (player.joined !== gameToken))
+						return `Player "${player.name}" not in game "${game.name}"`;
 					if (game.players[game.turns] !== playerToken)
-						return `It is not the turn of player "${player?.name}"`;
+						return `It is not the turn of player "${player.name}"`;
 				}
 			}
 			if (playerToken2 && (game.players.filter(k => k === playerToken2).length <= 0))
@@ -208,18 +217,23 @@ export const reducer = (
 					case 'GameClosed':
 						error = validate({ playerToken: event.payload.playerToken });
 						if (!error) {
-							const game = Object.values(games).filter(game => game.host === event.payload.playerToken);
-							if (game.length <= 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player "${players[event.payload.playerToken].name}" is not hosting any game`));
-							} else if (game.length > 1) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player "${players[event.payload.playerToken].name}" is hosting more than one game`));
-							} else if (games[game[0].token].round >= 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game "${games[game[0].token].name}" in progress and cannot be closed`));
-							} else {
-								games[game[0].token].status = Status.Deleted;
-								for (const player of Object.values(players).filter(player => player.joined && (player.joined === game[0].token))) {
-									player.joined = undefined;
+							const joinedToken = players[event.payload.playerToken].joined;
+							if (joinedToken) {
+								error = validate({ hostToken: event.payload.playerToken, gameToken: joinedToken });
+								if (!error) {
+									if (games[joinedToken].round >= 0) {
+										messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game "${games[joinedToken].name}" in progress and cannot be closed`));
+									} else {
+										games[joinedToken].status = Status.Deleted;
+										for (const player of Object.values(players).filter(player => player.joined && (player.joined === joinedToken))) {
+											player.joined = undefined;
+										}
+									}
+								} else {
+									messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 								}
+							} else {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player "${players[event.payload.playerToken].name}" is not hosting any game`));
 							}
 						} else {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
@@ -234,7 +248,7 @@ export const reducer = (
 						});
 						if (!error) {
 							if (games[event.payload.gameToken].host === event.payload.playerToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You already in your own game`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You don't need to join your own game`));
 							}if (players[event.payload.playerToken].joined) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You already joined game "${players[event.payload.playerToken].joined}"`));
 							} else if (Object.values(players).filter(player => player.joined === event.payload.gameToken).length >= rules.MaxPlayerPerGame) {
@@ -255,7 +269,7 @@ export const reducer = (
 							if (!joinedToken) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not in any game currently`));
 							} else if (games[joinedToken].host === event.payload.playerToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You cannot quit the game you are hosting`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You cannot quit from the game you are hosting`));
 							} else {
 								players[event.payload.playerToken].joined = undefined;
 								games[joinedToken].players = games[joinedToken].players.filter(p => p !== event.payload.playerToken);
@@ -268,16 +282,12 @@ export const reducer = (
 					case 'PlayerShuffled':
 						error = validate({
 							playerToken: event.payload.playerToken,
+							hostToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
 							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
 						});
 						if (!error) {
-							const joinedToken = players[event.payload.playerToken].joined;
-							if (!joinedToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not in any game currently`));
-							} else if (games[joinedToken].host !== event.payload.playerToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not the host of this game`));
-							} else if (games[event.payload.gameToken].players.length < rules.MinPlayerPerGame) {
+							if (games[event.payload.gameToken].players.length < rules.MinPlayerPerGame) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Not enough players in the game "${games[event.payload.gameToken].name}" yet`));
 							} else {
 								games[event.payload.gameToken].players = event.payload.players;
@@ -289,6 +299,8 @@ export const reducer = (
 
 					case 'TerritoryAssigned':
 						error = validate({
+							playerToken: event.payload.playerToken,
+							hostToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
 							territory: event.payload.territoryName,
 							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
@@ -315,12 +327,31 @@ export const reducer = (
 
 					case 'CardReturned':
 						error = validate({
+							playerToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
-							cards: [event.payload.cardName],
-							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
+							cards: [event.payload.cardName]
 						});
 						if (!error) {
-							games[event.payload.gameToken].cards.push(deck[event.payload.cardName as Territories | WildCards]);
+							if (games[event.payload.gameToken].round < 0) {
+								// From StartGame
+								if (games[event.payload.gameToken].host !== event.payload.playerToken) {
+									messages.push(buildMessage(
+										commit.id, MessageType.Error, event.type,
+										`Player "${players[event.payload.playerToken].name}" is not the host of game "${games[event.payload.gameToken].name}"`
+									));
+									break;
+								}
+							} else if (games[event.payload.gameToken].round === 0) {
+								// Error
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Event "CardReturned" is invalid during game setup phase`));
+								break;
+							}
+
+							if (games[event.payload.gameToken].cards.filter(c => c.name === event.payload.cardName).length > 0) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.cardName}" already in the deck`));
+							} else {
+								games[event.payload.gameToken].cards.push(deck[event.payload.cardName as Territories | WildCards]);
+							}
 						} else {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						}
@@ -329,21 +360,22 @@ export const reducer = (
 					case 'GameStarted':
 						error = validate({
 							playerToken: event.payload.playerToken,
+							hostToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
 							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
 						});
 						if (!error) {
-							const joinedToken = players[event.payload.playerToken].joined;
-							if (!joinedToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not in any game currently`));
-							} else if (games[joinedToken].host !== event.payload.playerToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not the host of this game`));
-							} else if (games[event.payload.gameToken].players.length < rules.MinPlayerPerGame) {
+							if (games[event.payload.gameToken].players.length < rules.MinPlayerPerGame) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Not enough players in the game "${games[event.payload.gameToken].name}" yet`));
 							} else {
 								games[event.payload.gameToken].status = Status.Ready;
 								games[event.payload.gameToken].round = 0;
 								games[event.payload.gameToken].turns = 0; // First player start game setup
+
+								const playerLen = games[event.payload.gameToken].players.length; // ReinforcementArrived
+								for (const p of games[event.payload.gameToken].players) {
+									players[p].reinforcement = rules.initialTroops(playerLen) - Object.keys(players[p].holdings).length;
+								}
 							}
 						} else {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));

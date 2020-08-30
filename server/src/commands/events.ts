@@ -87,6 +87,7 @@ export interface GameStarted extends BaseEvent {
 export interface TerritoryAssigned extends BaseEvent {
 	readonly type: 'TerritoryAssigned';
 	payload: {
+		playerToken: string; // NOTE: this is the host's token starting a game (and assigning territories)
 		gameToken: string;
 		territoryName: string;
 	}
@@ -100,49 +101,49 @@ export interface TerritoryAssigned extends BaseEvent {
 // 	}
 // }
 
-// export interface MoveMade extends BaseEvent {
-// 	readonly type: 'MoveMade';
-// 	payload: {
-// 		playerToken: string;
-// 		gameToken: string;
-// 		territoryName: string;
-// 		flag: number;
-// 	}
-// }
-
-export interface TerritorySelected extends BaseEvent {
-	readonly type: 'TerritorySelected';
+export interface MoveMade extends BaseEvent {
+	readonly type: 'MoveMade';
 	payload: {
 		playerToken: string;
 		gameToken: string;
 		territoryName: string;
+		flag: number;
 	}
 }
 
-/** Placing troops on map (both during game setup and add reinforcement at start of turns */
-	export interface TroopPlaced extends BaseEvent {
-		readonly type: 'TroopPlaced';
-		payload: {
-			playerToken: string;
-			gameToken: string;
-			territoryName: string;
-			amount: number;
-		}
-	}
+// export interface TerritorySelected extends BaseEvent {
+// 	readonly type: 'TerritorySelected';
+// 	payload: {
+// 		playerToken: string;
+// 		gameToken: string;
+// 		territoryName: string;
+// 	}
+// }
+
+// /** Placing troops on map (both during game setup and add reinforcement at start of turns */
+// 	export interface TroopPlaced extends BaseEvent {
+// 		readonly type: 'TroopPlaced';
+// 		payload: {
+// 			playerToken: string;
+// 			gameToken: string;
+// 			territoryName: string;
+// 			amount: number;
+// 		}
+// 	}
 	
-/** fromPlayer is the attacker, toPlayer is the defender */
-export interface TerritoryAttacked extends BaseEvent {
-	readonly type: 'TerritoryAttacked';
-	payload: {
-		fromPlayer: string;
-		toPlayer: string;
-		gameToken: string;
-		fromTerritory: string;
-		toTerritory: string;
-		attackerLoss: number;
-		defenderLoss: number;
-	}
-}
+// /** fromPlayer is the attacker, toPlayer is the defender */
+// export interface TerritoryAttacked extends BaseEvent {
+// 	readonly type: 'TerritoryAttacked';
+// 	payload: {
+// 		fromPlayer: string;
+// 		toPlayer: string;
+// 		gameToken: string;
+// 		fromTerritory: string;
+// 		toTerritory: string;
+// 		attackerLoss: number;
+// 		defenderLoss: number;
+// 	}
+// }
 
 // /** fromPlayer is the conquerer, toPlayer is the original owner */
 // export interface TerritoryConquered extends BaseEvent {
@@ -156,26 +157,26 @@ export interface TerritoryAttacked extends BaseEvent {
 // 	}
 // }
 
-export interface TerritoryFortified extends BaseEvent {
-	readonly type: 'TerritoryFortified';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-		fromTerritory: string;
-		toTerritory: string;
-		amount: number;
-	}
-}
+// export interface TerritoryFortified extends BaseEvent {
+// 	readonly type: 'TerritoryFortified';
+// 	payload: {
+// 		playerToken: string;
+// 		gameToken: string;
+// 		fromTerritory: string;
+// 		toTerritory: string;
+// 		amount: number;
+// 	}
+// }
 
-/** fromPlayer is the conquerer, toPlayer is the one who got defeated */
-export interface PlayerDefeated extends BaseEvent {
-	readonly type: 'PlayerDefeated';
-	payload: {
-		fromPlayer: string;
-		toPlayer: string;
-		gameToken: string;
-	}
-}
+// /** fromPlayer is the conquerer, toPlayer is the one who got defeated */
+// export interface PlayerDefeated extends BaseEvent {
+// 	readonly type: 'PlayerDefeated';
+// 	payload: {
+// 		fromPlayer: string;
+// 		toPlayer: string;
+// 		gameToken: string;
+// 	}
+// }
 
 // /** Placing reinforcement during reinforcement stage */
 // export interface TroopAdded extends BaseEvent {
@@ -197,39 +198,40 @@ export interface PlayerDefeated extends BaseEvent {
 // 	}
 // }
 
-export interface TurnEnded extends BaseEvent {
-	readonly type: 'TurnEnded';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-	}
-}
+// export interface TurnEnded extends BaseEvent {
+// 	readonly type: 'TurnEnded';
+// 	payload: {
+// 		playerToken: string;
+// 		gameToken: string;
+// 	}
+// }
 
 /** Card put back to the deck */
 export interface CardReturned extends BaseEvent {
 	readonly type: 'CardReturned';
 	payload: {
+		playerToken: string;
 		gameToken: string;
 		cardName: string;
 	}
 }
 
-export interface CardsRedeemed extends BaseEvent {
-	readonly type: 'CardsRedeemed';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-		cardNames: string[];
-	}
-}
+// export interface CardsRedeemed extends BaseEvent {
+// 	readonly type: 'CardsRedeemed';
+// 	payload: {
+// 		playerToken: string;
+// 		gameToken: string;
+// 		cardNames: string[];
+// 	}
+// }
 
-export interface GameWon extends BaseEvent {
-	readonly type: 'GameWon';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-	}
-}
+// export interface GameWon extends BaseEvent {
+// 	readonly type: 'GameWon';
+// 	payload: {
+// 		playerToken: string;
+// 		gameToken: string;
+// 	}
+// }
 // ************************
 
 // export type Events =

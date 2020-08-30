@@ -32,10 +32,11 @@ export const _shuffle = <T>(list: T[]): T[] => {
 	let cnt = rand.length - size;
 	if (cnt < 0) return list;
 	while (size > 0) {
+		size --;
 		const indx = rand[cnt ++]; // Math.floor(Math.random() * size);
-		const last = list[-- size];
-		list[size] = list[indx];
-		list[indx] = last;
+		const frst = list[0];
+		list[0] = list[indx];
+		list[indx] = frst;
 	}
 	return list;
 };

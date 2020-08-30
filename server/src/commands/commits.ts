@@ -26,7 +26,17 @@ export const toCommits = (tag: string, values: string[][]) => {
 	return results;
 };
 
-export const createCommit = () => {
+interface AddEvent {
+	build: ({ put, get }: {
+		put: (commit: Commit) => Promise<Commit>,
+		get: (args?: { id?: string; from?: string; to?: string}) => Promise<Commit[]>
+	}) => Promise<Commit>;
+	addEvent: <E extends BaseEvent>(event: E) => this;
+}
+
+export const createCommit = (): {
+	addEvent: <E extends BaseEvent>(event: E) => AddEvent;
+} => {
 	const commit: Commit = {
 		id: '',
 		version: 0,

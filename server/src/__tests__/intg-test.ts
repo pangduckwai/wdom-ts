@@ -22,10 +22,11 @@ const output = (
 		const y = Object.values(reports.games).filter(g => g.host === x)[0].token;
 		const g = reports.games[y];
 		const output = 
-	`* "${g.name}" [status: ${g.status}] [round: ${g.round}] [turn: ${g.turns}] [redeemed: ${g.redeemed}]
-	 Members:${g.players.map(k => {
+	`>>> "${g.name}" [status: ${g.status}] [round: ${g.round}] [turn: ${g.turns}] [redeemed: ${g.redeemed}]
+  Card deck: ${g.cards.map(c => c.name)}
+  Members:${g.players.map(k => {
 		const p = reports.players[k];
-		return `\n ${k === x ? '*' : '-' } "${p.name}" [status: ${p.status}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"] [selected: ${reports.players[k].selected}]
+		return `\n  ${k === x ? '*' : '-' } "${p.name}" [status: ${p.status}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"] [selected: ${reports.players[k].selected}]
 	....holdings:${Object.values(p.holdings).map(t => ` ${t.name}[${t.troop}]`)}
 	....cards   :${Object.values(p.cards).map(c => `${c.name}(${c.type})`)}`;
 	})}`;
@@ -180,13 +181,13 @@ describe('Integration tests', () => {
 		}
 	});
 
-	it('player join his own game', async () => {
+	it('player join his/her own game', async () => {
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'pete')[0].token;
 		const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
 		await commands.JoinGame({ playerToken, gameToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'You already in your own game').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === 'You don\'t need to join your own game').length).toEqual(1);
 	});
 
 	it('player close game', async () => {
@@ -205,7 +206,7 @@ describe('Integration tests', () => {
 		await commands.CloseGame({ playerToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Player "matt" is not hosting any game').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === 'Player "matt" is not the host of game "josh\'s game"').length).toEqual(1);
 	});
 
 	it('players join another game', async () => {
@@ -249,7 +250,7 @@ describe('Integration tests', () => {
 		await commands.QuitGame({ playerToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'You cannot quit the game you are hosting').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === 'You cannot quit from the game you are hosting').length).toEqual(1);
 	});
 
 	it('player not in a game try to quit game', async () => {
@@ -267,7 +268,7 @@ describe('Integration tests', () => {
 		await commands.StartGame({ playerToken, gameToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'You are not the host of this game').length).toEqual(2);
+		expect(reports.messages.filter(m => m.message === 'Player "matt" is not the host of game "josh\'s game"').length).toEqual(89);
 	});
 
 	it('player try to join a full game', async () => {
@@ -280,22 +281,22 @@ describe('Integration tests', () => {
 		expect(reports.messages.filter(m => m.message === 'Game "josh\'s game" already full').length).toEqual(1);
 	});
 
-	// it('player start a game', async () => {
-	// 	const playerToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
-	// 	const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
-	// 	await commands.StartGame({ playerToken, gameToken });
-	// 	const { players, games } = await snapshot.read();
-	// 	reports = { players, games, messages: await subscriptions.report(channel) };
+	it('player start a game', async () => {
+		const playerToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
+		await commands.StartGame({ playerToken, gameToken });
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
 
-	// 	const cards = reports.games[gameToken].cards.map(c => c.name);
-	// 	expect(cards.length).toEqual(44);
-	// 	expect(cards[42]).toEqual('Wildcard-2');
+		const cards = reports.games[gameToken].cards.map(c => c.name);
+		expect(cards.length).toEqual(44);
+		expect(cards[36]).toEqual('Wildcard-2');
 
-	// 	const holdings = reports.players[playerToken].holdings;
-	// 	expect(Object.keys(holdings).length).toEqual(7);
-	// 	expect(Object.values(holdings).map(t => t.name)[3]).toEqual('Great-Britain');
-	// 	expect(reports.games[gameToken].status).toEqual(2);
-	// 	expect(reports.players[playerToken].reinforcement).toEqual(rules.initialTroops(6) - Object.keys(reports.players[playerToken].holdings).length);
-	// });
+		const holdings = reports.players[playerToken].holdings;
+		expect(Object.keys(holdings).length).toEqual(7);
+		expect(Object.values(holdings).map(t => t.name)[5]).toEqual('Eastern-United-States');
+		expect(reports.games[gameToken].status).toEqual(2);
+		expect(reports.players[playerToken].reinforcement).toEqual(rules.initialTroops(6) - Object.keys(reports.players[playerToken].holdings).length);
+	});
 
 });
