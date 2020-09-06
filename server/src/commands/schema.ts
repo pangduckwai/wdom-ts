@@ -92,7 +92,7 @@ export const resolvers = {
 	},
 	Mutation: {
     registerPlayer: async (_: any, { playerName }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-      getCommands(getCommitStore(channel, client)).RegisterPlayer({ playerName })
+      getCommands(channel, client).RegisterPlayer({ playerName })
 				.then(result => result)
 				.catch(error => new ApolloError(error)),
 		// leaveGameRoom: async (_: any, { playerToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>

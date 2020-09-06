@@ -4,9 +4,9 @@ import { _shuffle, Territories, WildCards } from '../rules';
 import {
 	Commit, CommitStore, createCommit, getCommitStore,
 	PlayerRegistered, PlayerLeft,
-	GameOpened, GameClosed, GameJoined, GameQuitted, PlayerShuffled,
-	GameStarted, TerritoryAssigned, MoveMade,
-	// TerritoryAttacked, TerritoryFortified, TerritorySelected, TroopPlaced, TurnEnded,
+	GameOpened, GameClosed, GameJoined, GameQuitted,
+	PlayerShuffled, GameStarted, TerritoryAssigned,
+	TerritorySelected, // TerritoryAttacked, TerritoryFortified, TroopPlaced, TurnEnded,
 	CardReturned,
 	// CardsRedeemed, PlayerDefeated, GameWon
 } from '.';
@@ -19,9 +19,10 @@ export type Commands = {
 	JoinGame: (payload: { playerToken: string; gameToken: string }) => Promise<Commit>,
 	QuitGame: (payload: { playerToken: string }) => Promise<Commit>,
 	StartGame: (payload: { playerToken: string; gameToken: string }) => Promise<Commit>,
+	MakeMove: (payload: { playerToken: string; gameToken: string; territoryName: string; flag: number }) => Promise<Commit>,
 };
 
-export const getCommands = (channel: string, client: Redis) => {
+export const getCommands = (channel: string, client: Redis): Commands => {
 	const commitStore: CommitStore = getCommitStore(channel, client);
 	const snapshot = getSnapshot(channel, client);
 
@@ -57,7 +58,7 @@ export const getCommands = (channel: string, client: Redis) => {
 				payload
 			}).build(commitStore),
 		StartGame: async (payload: { playerToken: string; gameToken: string }) => {
-			const { players, games } = await snapshot.read();
+			const { games } = await snapshot.read();
 			const tokens: string[] = _shuffle(games[payload.gameToken].players);
 			// Need to do these here because need to record player orders, territory assigned, and cards, in a event, otherwise cannot replay
 			const { build, addEvent } = createCommit().addEvent<PlayerShuffled>({
@@ -85,16 +86,35 @@ export const getCommands = (channel: string, client: Redis) => {
 			});
 			return build(commitStore);
 		},
+		MakeMove: async ({
+			playerToken, gameToken, territoryName, flag
+		}: {
+			playerToken: string; gameToken: string; territoryName: string; flag: number
+		}) => {
+			const { players, games } = await snapshot.read();
+			const player = players[playerToken];
+			if (!player) return new Promise<Commit>((_, reject) => {
+				reject(new Error(`[commands] Invalid player ${playerToken}`));
+			});
+			const game = games[gameToken];
+			if (!game) return new Promise<Commit>((_, reject) => {
+				reject(new Error(`[commands] Invalid game ${gameToken}`));
+			});
+
+			const { build, addEvent } = createCommit().addEvent<TerritorySelected>({
+				type: 'TerritorySelected',
+				payload: { playerToken, gameToken, territoryName }
+			});
+			if (game.round === 0) {
+				// setup phase
+				
+			}
+		},
 		// FinishSetup: (payload: { playerToken: string; gameToken: string }) =>
 		// 	createCommit().addEvent<SetupFinished>({
 		// 		type: 'SetupFinished',
 		// 		payload
 		// 	}).build(commitStore),
-		MakeMove: (payload: { playerToken: string; gameToken: string; territoryName: string; flag: number }) =>
-			createCommit().addEvent<MoveMade>({
-				type: 'MoveMade',
-				payload
-			}).build(commitStore),
 		// PlaceTroop: (payload: { playerToken: string; gameToken: string; territoryName: string; amount: number }) => {
 		// 	return createCommit().addEvent<TroopPlaced>({
 		// 		type: 'TroopPlaced',

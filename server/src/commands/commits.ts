@@ -26,46 +26,6 @@ export const toCommits = (tag: string, values: string[][]) => {
 	return results;
 };
 
-interface AddEvent {
-	build: ({ put, get }: {
-		put: (commit: Commit) => Promise<Commit>,
-		get: (args?: { id?: string; from?: string; to?: string}) => Promise<Commit[]>
-	}) => Promise<Commit>;
-	addEvent: <E extends BaseEvent>(event: E) => this;
-}
-
-export const createCommit = (): {
-	addEvent: <E extends BaseEvent>(event: E) => AddEvent;
-} => {
-	const commit: Commit = {
-		id: '',
-		version: 0,
-		events: []
-	};
-
-	const build = async ({ put, get }: {
-		put: (commit: Commit) => Promise<Commit>,
-		get: (args?: { id?: string; from?: string; to?: string}) => Promise<Commit[]>
-	}): Promise<Commit> => {
-		if (commit.events.length < 1)
-			return new Promise<Commit>((_, reject) => {
-				reject(new Error('[createCommit] Invalid parameter(s)'));
-			});
-		else
-			return put(commit);
-	}
-
-	const addEvent = <E extends BaseEvent>(event: E) => {
-		commit.events.push(event);
-		return {
-			build,
-			addEvent
-		};
-	}
-
-	return { addEvent };
-};
-
 /* NOTE HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 The following can calc number of digits needed,
 but useless in this case, because there is no way
@@ -156,4 +116,38 @@ export const getCommitStore = (channel: string, client: Redis, ttl?: number): Co
 			});
 		}
 	};
+};
+
+interface AddEvent {
+	build: ({ put }: CommitStore) => Promise<Commit>;
+	addEvent: <E extends BaseEvent>(event: E) => this;
+}
+
+export const createCommit = (): {
+	addEvent: <E extends BaseEvent>(event: E) => AddEvent;
+} => {
+	const commit: Commit = {
+		id: '',
+		version: 0,
+		events: []
+	};
+
+	const build = async ({ put }: CommitStore): Promise<Commit> => {
+		if (commit.events.length < 1)
+			return new Promise<Commit>((_, reject) => {
+				reject(new Error('[createCommit] Invalid parameter(s)'));
+			});
+		else
+			return put(commit);
+	}
+
+	const addEvent = <E extends BaseEvent>(event: E) => {
+		commit.events.push(event);
+		return {
+			build,
+			addEvent
+		};
+	}
+
+	return { addEvent };
 };

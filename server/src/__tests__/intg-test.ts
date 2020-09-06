@@ -299,4 +299,5 @@ describe('Integration tests', () => {
 		expect(reports.players[playerToken].reinforcement).toEqual(rules.initialTroops(6) - Object.keys(reports.players[playerToken].holdings).length);
 	});
 
+	it('setup games', async () => {});
 });

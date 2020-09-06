@@ -49,16 +49,22 @@ export interface GameQuitted extends BaseEvent {
 		playerToken: string;
 	}
 }
-// ************************
 
-// ************************
-// *** Game play Events ***
 export interface PlayerShuffled extends BaseEvent {
 	readonly type: 'PlayerShuffled';
 	payload: {
 		playerToken: string;
 		gameToken: string;
 		players: string[];
+	}
+}
+
+export interface TerritoryAssigned extends BaseEvent {
+	readonly type: 'TerritoryAssigned';
+	payload: {
+		playerToken: string; // NOTE: this is the host's token starting a game (and assigning territories)
+		gameToken: string;
+		territoryName: string;
 	}
 }
 
@@ -69,6 +75,91 @@ export interface GameStarted extends BaseEvent {
 		gameToken: string;
 	}
 }
+// ************************
+
+// ********************************
+// *** MakeMove derived events ***
+export interface TerritorySelected extends BaseEvent {
+	readonly type: 'TerritorySelected';
+	payload: {
+		playerToken: string;
+		gameToken: string;
+		territoryName: string;
+	}
+}
+
+/** TroopPlaced - place troop(s) during setup and at the begining of each turn */
+export interface TroopPlaced extends BaseEvent {
+	readonly type: 'TroopPlaced';
+	payload: {
+		playerToken: string;
+		gameToken: string;
+		territoryName: string;
+		amount: number;
+		flag: number;
+	}
+}
+
+export interface TerritoryAttacked extends BaseEvent {
+	readonly type: 'TerritoryAttacked';
+	payload: {
+		fromPlayer: string;
+		toPlayer: string;
+		gameToken: string;
+		fromTerritory: string;
+		toTerritory: string;
+		redDice: number[];
+		whiteDice: number[];
+		attackerLoss: number;
+		defenderLoss: number;
+	}
+}
+
+export interface TerritoryFortified extends BaseEvent {
+	readonly type: 'TerritoryFortified';
+	payload: {
+		playerToken: string;
+		gameToken: string;
+		fromTerritory: string;
+		toTerritory: string;
+		amount: number;
+	}
+}
+// ********************************
+
+// ********************************
+// *** Game play events ***
+export interface TurnEnded extends BaseEvent {
+	readonly type: 'TurnEnded';
+	payload: {
+		playerToken: string;
+		gameToken: string;
+		cardName?: string; // If entitled to draw a card at the end of the turn, remember the card
+	}
+}
+// ********************************
+
+// ********************
+// *** Cards events ***
+/** Put card(s) back to the deck */
+export interface CardReturned extends BaseEvent {
+	readonly type: 'CardReturned';
+	payload: {
+		playerToken: string;
+		gameToken: string;
+		cardName: string;
+	}
+}
+
+export interface CardsRedeemed extends BaseEvent {
+	readonly type: 'CardsRedeemed';
+	payload: {
+		playerToken: string;
+		gameToken: string;
+		cardNames: string[];
+	}
+}
+// ********************
 
 // export interface SetupBegun extends BaseEvent {
 // 	readonly type: 'SetupBegun';
@@ -84,15 +175,6 @@ export interface GameStarted extends BaseEvent {
 // 	}
 // }
 
-export interface TerritoryAssigned extends BaseEvent {
-	readonly type: 'TerritoryAssigned';
-	payload: {
-		playerToken: string; // NOTE: this is the host's token starting a game (and assigning territories)
-		gameToken: string;
-		territoryName: string;
-	}
-}
-
 // export interface ReinforcementArrived extends BaseEvent {
 // 	readonly type: 'ReinforcementArrived';
 // 	payload: {
@@ -100,16 +182,6 @@ export interface TerritoryAssigned extends BaseEvent {
 // 		gameToken: string;
 // 	}
 // }
-
-export interface MoveMade extends BaseEvent {
-	readonly type: 'MoveMade';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-		territoryName: string;
-		flag: number;
-	}
-}
 
 // export interface TerritorySelected extends BaseEvent {
 // 	readonly type: 'TerritorySelected';
@@ -203,25 +275,6 @@ export interface MoveMade extends BaseEvent {
 // 	payload: {
 // 		playerToken: string;
 // 		gameToken: string;
-// 	}
-// }
-
-/** Card put back to the deck */
-export interface CardReturned extends BaseEvent {
-	readonly type: 'CardReturned';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-		cardName: string;
-	}
-}
-
-// export interface CardsRedeemed extends BaseEvent {
-// 	readonly type: 'CardsRedeemed';
-// 	payload: {
-// 		playerToken: string;
-// 		gameToken: string;
-// 		cardNames: string[];
 // 	}
 // }
 
