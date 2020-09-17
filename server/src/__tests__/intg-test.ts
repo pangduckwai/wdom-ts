@@ -38,7 +38,10 @@ const output = (
 		console.log(room);
 
 		let message = '';
-		for (let i = ((reports.messages.length - 5) > 0 ? reports.messages.length - 5 : 0); i < reports.messages.length; i ++) {
+		// for (let i = ((reports.messages.length - 5) > 0 ? reports.messages.length - 5 : 0); i < reports.messages.length; i ++) {
+		// 	message += `${reports.messages[i].commitId} ${reports.messages[i].type} ${reports.messages[i].eventName} ${reports.messages[i].message}\n`;
+		// }
+		for (let i = 0; i < reports.messages.length; i ++) {
 			message += `${reports.messages[i].commitId} ${reports.messages[i].type} ${reports.messages[i].eventName} ${reports.messages[i].message}\n`;
 		}
 		if (reports.messages.length > 0) console.log(message);
@@ -73,7 +76,7 @@ let reports: {
 beforeAll(async () => {
 	publisher = new RedisClient({ host, port });
 	subscriber = new RedisClient({ host, port });
-	commands = getCommands(channel, publisher);
+	commands = getCommands(channel, publisher, world, map, deck);
 	snapshot = getSnapshot(channel, publisher);
 	subscriptions = getSubscriptions(publisher, world, map, deck);
 	reports = {
@@ -231,10 +234,7 @@ describe('Integration tests', () => {
 	it('try to start a game with too few players', async () => {
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'pete')[0].token;
 		const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
-		await commands.StartGame({ playerToken, gameToken });
-		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Not enough players in the game "pete\'s game" yet').length).toEqual(44);
+		await expect(commands.StartGame({ playerToken, gameToken })).rejects.toThrow('Not enough players in the game "pete\'s game" yet');
 	});
 
 	it('player quit a game', async () => {
@@ -265,10 +265,10 @@ describe('Integration tests', () => {
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'matt')[0].token;
 		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
 		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
-		await commands.StartGame({ playerToken, gameToken });
-		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Player "matt" is not the host of game "josh\'s game"').length).toEqual(89);
+		await expect(commands.StartGame({ playerToken, gameToken })).rejects.toThrow('Player "matt" is not the host of game "josh\'s game"');
+		// const { players, games } = await snapshot.read();
+		// reports = { players, games, messages: await subscriptions.report(channel) };
+		// expect(reports.messages.filter(m => m.message === 'Player "matt" is not the host of game "josh\'s game"').length).toEqual(89);
 	});
 
 	it('player try to join a full game', async () => {

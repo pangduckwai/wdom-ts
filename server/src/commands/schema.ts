@@ -91,10 +91,10 @@ export const resolvers = {
 		},
 	},
 	Mutation: {
-    registerPlayer: async (_: any, { playerName }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-      getCommands(channel, client).RegisterPlayer({ playerName })
-				.then(result => result)
-				.catch(error => new ApolloError(error)),
+    // registerPlayer: async (_: any, { playerName }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
+    //   getCommands(channel, client).RegisterPlayer({ playerName })
+		// 		.then(result => result)
+		// 		.catch(error => new ApolloError(error)),
 		// leaveGameRoom: async (_: any, { playerToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
 		// 	CommitStore(client).put(channel, Commands.PlayerLeave({ playerToken }))
 		// 		.then(result => result)

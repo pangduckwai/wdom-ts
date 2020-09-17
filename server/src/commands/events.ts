@@ -96,7 +96,6 @@ export interface TroopPlaced extends BaseEvent {
 		gameToken: string;
 		territoryName: string;
 		amount: number;
-		flag: number;
 	}
 }
 
