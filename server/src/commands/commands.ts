@@ -120,7 +120,6 @@ export const getCommands = (
 			const { players, games } = await snapshot.read();
 			const error = validator(players, games)({
 				playerToken,
-				hostToken: playerToken,
 				gameToken,
 				territory: territoryName,
 				expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameStarted }
@@ -147,6 +146,8 @@ export const getCommands = (
 								}
 							});
 						}
+					} else {
+						// TODO HERE!!!
 					}
 				}
 				return build(commitStore);

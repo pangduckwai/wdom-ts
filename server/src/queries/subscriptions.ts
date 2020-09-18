@@ -81,7 +81,7 @@ export const getSubscriptions = (
 
 								if (subscribers[channel].lastPosition) criteria.from = subscribers[channel].lastPosition;
 								const incomings = await commitStore.get(criteria);
-								console.log("INCOMING!!!", incomings.length, criteria); // TODO TEMP
+								if (incomings.length > 1) console.log("INCOMING!!!", incomings.length, criteria); // TODO TEMP
 
 								// Get 'next' position
 								const streamId = notification.split('-');

@@ -60,6 +60,17 @@ const gameHosts: Record<string, string[]> = {
 	'josh': ['matt'], // 'nick', 'mike', 'john', 'saul'
 	'saul': ['nick', 'mike', 'john']
 };
+const initLocation = (index: number) => {
+	switch (index) {
+		case 0: return 'Eastern-Australia';
+		case 1: return 'Indonesia';
+		case 2: return 'Argentina';
+		case 3: return 'Egypt';
+		case 4: return 'Quebec';
+		case 5: return 'Venezuela';
+		default: return 'Wildcard';
+	}
+};
 
 const channel = `${CHANNEL}intg`;
 let publisher: Redis;
@@ -299,5 +310,73 @@ describe('Integration tests', () => {
 		expect(reports.players[playerToken].reinforcement).toEqual(rules.initialTroops(6) - Object.keys(reports.players[playerToken].holdings).length);
 	});
 
-	it('setup games', async () => {});
+	it('player not in turn try to place troop during game setup phase', async () => {
+		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+		await expect(commands.MakeMove({
+			playerToken: hostToken,
+			gameToken,
+			territoryName: 'Indonesia',
+			flag: 0
+		})).rejects.toThrow('It is not the turn of player "josh"');
+	});
+
+	it('players place troops', async () => {
+		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+		let index = reports.games[gameToken].turns;
+		for (let i = 0; i < 10; i ++) {
+			const territoryName = initLocation(index);
+			await commands.MakeMove({
+				playerToken: reports.games[gameToken].players[index],
+				gameToken,
+				territoryName,
+				flag: 0
+			});
+
+			index ++;
+			if (index >= reports.games[gameToken].players.length) index = 0;
+		}
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.games[gameToken].turns).toEqual(4);
+	});
+
+	it('a player place all remaining troops at once', async () => {
+		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+		let index = reports.games[gameToken].turns;
+		const playerToken = reports.games[gameToken].players[index];
+		await commands.MakeMove({
+			playerToken,
+			gameToken,
+			territoryName: 'Quebec',
+			flag: 2
+		});
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.players[playerToken].reinforcement).toEqual(0);
+	});
+
+	it('other players continue to place troops one at a time', async () => {
+		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
+		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
+		for (let i = 0; i < 31; i ++) {
+			const index = reports.games[gameToken].turns;
+			const territoryName = initLocation(index);
+			await commands.MakeMove({
+				playerToken: reports.games[gameToken].players[index],
+				gameToken,
+				territoryName,
+				flag: 0
+			});
+
+			const { players, games } = await snapshot.read();
+			reports.players = players;
+			reports.games = games;
+		}
+		reports.messages = await subscriptions.report(channel);
+		expect(reports.games[gameToken].round).toEqual(1);
+		expect(reports.players[reports.games[gameToken].players[reports.games[gameToken].turns]].reinforcement).toEqual(3);
+	});
 });

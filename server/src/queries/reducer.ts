@@ -3,6 +3,21 @@ import { generateToken } from '..';
 import { Card, rules, _shuffle, Territories, WildCards, Territory, Continents, Continent, getValidator, GameStage, Expected } from '../rules';
 import { buildMessage, Game, Message, MessageType, Player, Status } from '.';
 
+const turnStarted = (
+	world: Record<Continents, Continent>,
+	players: Record<string, Player>,
+	games: Record<string, Game>,
+	gameToken: string
+) => {
+	const playerToken = games[gameToken].players[games[gameToken].turns];
+	players[playerToken].holdingsCount = Object.keys(players[playerToken].holdings).length;
+
+	// ReinforcementArrived
+	players[playerToken].reinforcement =
+		rules.basicReinforcement(players[playerToken].holdings) +
+		rules.continentReinforcement(world, players[playerToken].holdings);
+};
+
 export const reducer = (
 	world: Record<Continents, Continent>,
 	map: Record<Territories, Territory>,
@@ -256,11 +271,50 @@ export const reducer = (
 					case 'TroopPlaced':
 						error = validator(players, games)({
 							playerToken: event.payload.playerToken,
-							hostToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
 							territory: event.payload.territoryName,
 							expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameStarted }
 						});
+						if (!error) {
+							if (Object.keys(players[event.payload.playerToken].holdings).filter(t => t === event.payload.territoryName).length <= 0) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Cannot place troops on another player's territory`));
+							} else if (players[event.payload.playerToken].reinforcement < event.payload.amount) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Insufficient reinforcement`));
+							} else {
+								players[event.payload.playerToken].holdings[event.payload.territoryName].troop += event.payload.amount;
+								players[event.payload.playerToken].reinforcement -= event.payload.amount;
+								if (games[event.payload.gameToken].round === 0) {
+									// Setup phase
+									if (games[event.payload.gameToken].players.filter(p => players[p].reinforcement > 0).length <= 0) {
+										// Setup phase done, move to first player's first turn
+										games[event.payload.gameToken].round = 1;
+										games[event.payload.gameToken].turns = 0;
+										turnStarted(world, players, games, event.payload.gameToken);
+									} else if (event.payload.amount >= 0) {
+										// Setup phase continue, next player's turn, unless the player just deduct a troop from one territory
+										let count = 0;
+										do {
+											count ++;
+											games[event.payload.gameToken].turns ++;
+											if (games[event.payload.gameToken].turns >= games[event.payload.gameToken].players.length)
+												games[event.payload.gameToken].turns = 0;
+										} while (
+											(players[games[event.payload.gameToken].players[games[event.payload.gameToken].turns]].reinforcement <= 0) &&
+											(count < games[event.payload.gameToken].players.length)
+										);
+										if (players[games[event.payload.gameToken].players[games[event.payload.gameToken].turns]].reinforcement <= 0) {
+											games[event.payload.gameToken].round = 1;
+											games[event.payload.gameToken].turns = 0;
+											turnStarted(world, players, games, event.payload.gameToken);
+										}
+									}
+								} else {
+									// Start of turn, place reinforcement and start attcking...
+								}
+							}
+						} else {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+						}
 						break;
 				}
 			}
