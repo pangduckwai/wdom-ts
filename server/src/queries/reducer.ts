@@ -209,7 +209,7 @@ export const reducer = (
 							playerToken: event.payload.playerToken,
 							hostToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
-							territory: event.payload.territoryName,
+							// territory: event.payload.territoryName,
 							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
 						});
 						if (!error) {
@@ -221,8 +221,8 @@ export const reducer = (
 							} else {
 								const playerToken = games[event.payload.gameToken].players[games[event.payload.gameToken].turns];
 								const player = players[playerToken];
-								player.holdings.push(event.payload.territoryName as Territories);
-								games[event.payload.gameToken].map[event.payload.territoryName as Territories].troop = 1;
+								player.holdings.push(event.payload.territory as Territories);
+								games[event.payload.gameToken].map[event.payload.territory as Territories].troop = 1;
 								games[event.payload.gameToken].turns ++;
 								if (games[event.payload.gameToken].turns >= playerLen) games[event.payload.gameToken].turns = 0;
 							}
@@ -235,7 +235,7 @@ export const reducer = (
 						error = validate({
 							playerToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
-							cards: [event.payload.cardName]
+							// cards: [event.payload.cardName]
 						});
 						if (!error) {
 							if (games[event.payload.gameToken].round < 0) {
@@ -253,10 +253,10 @@ export const reducer = (
 								break;
 							}
 
-							if (games[event.payload.gameToken].cards.filter(c => c.name === event.payload.cardName).length > 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.cardName}" already in the deck`));
+							if (games[event.payload.gameToken].cards.filter(c => c.name === event.payload.card).length > 0) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.card}" already in the deck`));
 							} else {
-								games[event.payload.gameToken].cards.push(deck[event.payload.cardName as Territories | WildCards]);
+								games[event.payload.gameToken].cards.push(deck[event.payload.card as Territories | WildCards]);
 							}
 						} else {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
@@ -289,33 +289,33 @@ export const reducer = (
 						break;
 
 					case 'TerritorySelected':
-						error = validator(players, games)({
+						error = validate({
 							playerToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
-							territory: event.payload.territoryName,
+							// territory: event.payload.territoryName,
 							expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameStarted }
 						});
 						if (!error) {
-							players[event.payload.playerToken].selected = event.payload.territoryName;
+							players[event.payload.playerToken].selected = event.payload.territory;
 						} else {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						}
 						break;
 
 					case 'TroopPlaced':
-						error = validator(players, games)({
+						error = validate({
 							playerToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
-							territory: event.payload.territoryName,
+							// territory: event.payload.territoryName,
 							expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameStarted }
 						});
 						if (!error) {
-							if (players[event.payload.playerToken].holdings.filter(t => t === event.payload.territoryName).length <= 0) {
+							if (players[event.payload.playerToken].holdings.filter(t => t === event.payload.territory).length <= 0) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Cannot place troops on another player's territory`));
 							} else if (players[event.payload.playerToken].reinforcement < event.payload.amount) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Insufficient reinforcement`));
 							} else {
-								games[event.payload.gameToken].map[event.payload.territoryName as Territories].troop += event.payload.amount;
+								games[event.payload.gameToken].map[event.payload.territory as Territories].troop += event.payload.amount;
 								players[event.payload.playerToken].reinforcement -= event.payload.amount;
 								if (games[event.payload.gameToken].round === 0) {
 									// Setup phase
@@ -351,7 +351,7 @@ export const reducer = (
 
 					case 'TerritoryAttacked':
 						const payload0 = (event as TerritoryAttacked).payload;
-						error = validator(players, games)({
+						error = validate({
 							playerToken: payload0.fromPlayer,
 							playerToken2: payload0.toPlayer,
 							gameToken: payload0.gameToken,
@@ -392,7 +392,7 @@ export const reducer = (
 						break;
 
 					case 'TurnEnded':
-						error = validator(players, games)({
+						error = validate({
 							playerToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
 							expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameInProgress }
@@ -407,7 +407,7 @@ export const reducer = (
 
 					case 'PositionFortified':
 						const payload1 = (event as PositionFortified).payload;
-						error = validator(players, games)({
+						error = validate({
 							playerToken: payload1.playerToken,
 							gameToken: payload1.gameToken,
 							territory: payload1.fromTerritory,

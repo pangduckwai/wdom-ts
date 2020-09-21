@@ -111,23 +111,6 @@ afterAll(async () => {
 });
 
 describe('Integration tests - Use random initial territory assignment rule', () => {
-	const commits: Record<string, Commit> = {};
-
-	// it('register 2 players and open a game', async () => {
-	// 	const c = await commands.RegisterPlayer({ playerName: 'paul' });
-	// 	commits[c.id] = c;
-	// 	const d = await commands.RegisterPlayer({ playerName: 'jack' });
-	// 	commits[d.id] = d;
-	// 	const g = await commands.OpenGame({ playerToken: c.id, gameName: 'paul\'s game' });
-	// 	console.log(`c: ${JSON.stringify(c,null,' ')}\nd: ${JSON.stringify(d,null,' ')}\ng: ${JSON.stringify(g,null,' ')}`);
-	// });
-
-	// it('read the snapshot of the 2 registered players', async () => {
-	// 	const { players, games } = await snapshot.read();
-	// 	console.log('p', players);
-	// 	console.log('g', games);
-	// });
-
 	it('players register in game room', async () => {
 		for (const playerName of playerNames) {
 			await commands.RegisterPlayer({ playerName: playerName });
