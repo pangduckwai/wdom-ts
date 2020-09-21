@@ -1,7 +1,5 @@
-import { Game, isGame, isPlayer, Player } from '.';
+import { Game, isGame, isPlayer, Player } from '../rules';
 
-export * from './games';
-export * from './players';
 export * from './messages';
 export * from './reducer';
 export * from './snapshot';

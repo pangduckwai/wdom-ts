@@ -1,8 +1,8 @@
 import { DataSource } from 'apollo-datasource';
 import { Redis } from 'ioredis';
 // import { isNotification, toCommits } from './commands';
-import { Game, Player, reducer } from './queries';
-import { buildDeck, buildMap } from './rules';
+import { reducer } from './queries';
+import { buildDeck, buildMap, Game, Player } from './rules';
 import { CHANNEL } from '.';
 
 export class EntityDS extends DataSource {

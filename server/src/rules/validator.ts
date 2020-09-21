@@ -1,5 +1,4 @@
-import { Game, Player } from '../queries';
-import { Card, _shuffle, Territories, WildCards, Territory } from '.';
+import { Card, Game, Player, _shuffle, Territories, WildCards, Territory } from '.';
 
 /**
  * The stages are Opened (-2), Started (-1), GameSetup (0), TurnSetup (>0), GamePlay(>0), the 'before' and 'after' modifiers are for

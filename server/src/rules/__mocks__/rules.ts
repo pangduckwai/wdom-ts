@@ -1,30 +1,30 @@
-import { Card, Continent, Continents, Territory } from '..';
+import { Card, Continent, Continents, Territories } from '..';
 
 export const rules = {
 	MinPlayerPerGame: 3,
 	MaxPlayerPerGame: 6,
 	MaxCardsPerPlayer: 5,
 	chooseFirstPlayer: (players: number) => Math.floor(Math.random() * players) + 1,
-	basicReinforcement: (holdings: Record<string, Territory>) => {
-		const ret = Math.floor(Object.keys(holdings).length / 3);
+	basicReinforcement: (holdings: Territories[]) => {
+		const ret = Math.floor(holdings.length / 3);
 		return (ret < 3) ? 3 : ret;
 	},
-	continentReinforcement: (continents: Record<Continents, Continent>, holdings: Record<string, Territory>) => {
+	continentReinforcement: (continents: Record<Continents, Continent>, holdings: Territories[]) => {
 		return Object.values(continents).reduce((total, continent) => {
-			const owned = Object.values(holdings).filter(territory => territory.continent === continent.name).length;
+			const owned = holdings.filter(territory => continent.territories.has(territory)).length;
 			return total + ((owned === continent.territories.size) ? continent.reinforcement : 0);
 		}, 0);
 	},
 	initialTroops: (players: number): number => {
 		switch(players) {
 			case 3:
-				return 30; // real 35;
+				return 29; // real 35;
 			case 4:
-				return 25; // real 30;
+				return 24; // real 30;
 			case 5:
-				return 20; // real 25;
+				return 19; // real 25;
 			case 6:
-				return 15; // real 20;
+				return 14; // real 20;
 			default:
 				return -1;
 		}

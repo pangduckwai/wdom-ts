@@ -5,8 +5,8 @@ import RedisClient, { Redis } from 'ioredis';
 import { fromEventPattern, Observable, Subscription } from 'rxjs';
 import { debounceTime, filter } from 'rxjs/operators';
 import { Commands, Commit, CommitStore, toCommits } from '../commands';
-import { Game, Message, Player, Subscriptions } from '../queries';
-import { buildDeck, buildMap, buildWorld, Card, rules, _shuffle, shuffle, Territories, WildCards } from '../rules';
+import { Message, Subscriptions } from '../queries';
+import { buildDeck, buildMap, buildWorld, Card, Game, Player, rules, _shuffle, shuffle, Territories, WildCards } from '../rules';
 import { CHANNEL, deserialize, isEmpty } from '..';
 
 const output = (
@@ -25,7 +25,7 @@ hostName: string) => {
  Members:${g.players.map(k => {
 	const p = reports.players[k];
 	return `\n ${k === x ? '*' : '-' } "${p.name}" [status: ${p.status}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"] [selected: ${reports.players[k].selected}]
-....holdings:${Object.values(p.holdings).map(t => ` ${t.name}[${t.troop}]`)}
+....holdings:${p.holdings.map(t => ` ${g.map[t].name}[${g.map[t].troop}]`)}
 ....cards   :${Object.values(p.cards).map(c => `${c.name}(${c.type})`)}`;
 })}`;
 	console.log(output.replace(/[.][.][.][.]/gi, '  '));

@@ -2,8 +2,8 @@ import { Redis } from 'ioredis';
 import { fromEventPattern, Observable, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { CommitStore, getCommitStore } from '../commands';
-import { Card, Continent, Continents, Territory, Territories, WildCards } from '../rules';
-import { Game, getSnapshot, Message, Player, reducer, Snapshot } from '.';
+import { Card, Continent, Continents, Game, Player, Territory, Territories, WildCards } from '../rules';
+import { getSnapshot, Message, reducer, Snapshot } from '.';
 
 export type Subscriptions = {
 	start: (channel: string) => Promise<number>;

@@ -5,8 +5,8 @@ import crypto from 'crypto';
 import RedisClient, { Redis } from 'ioredis';
 import { CHANNEL, isEmpty } from '..';
 import { BusyTimeout } from '../commands';
-import { Game, Player, Status } from '../queries';
-import { buildWorld, buildDeck, buildMap, Card, Continents, _shuffle, shuffle, Territories, WildCards } from '../rules';
+import { Status } from '../queries';
+import { buildWorld, buildDeck, buildMap, Card, Continents, Game, Player, _shuffle, shuffle, Territories, WildCards } from '../rules';
 
 const host = process.env.REDIS_HOST;
 const port = (process.env.REDIS_PORT || 6379) as number;
@@ -123,10 +123,8 @@ describe('Programming behaviour tests', () => {
 			name: 'Player One',
 			reinforcement: 0,
 			cards: {},
-			holdings: {},
+			holdings: [],
 			status: Status.New,
-			selected: '',
-			holdingsCount: 0
 		};
 		const list = shuffle<WildCards | Territories, Card>(deck);
 		for (let i = 0; i < 5; i ++) {

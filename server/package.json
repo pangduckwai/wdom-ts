@@ -14,7 +14,7 @@
 		"speed-test": "node ./dist/__tests__/speed-runs.js",
 		"test": "jest",
 		"prog-test": "jest prog-test",
-		"intg-test": "jest intg-test",
+		"itest": "jest itest",
 		"sim": "jest simulation",
 		"start": "nodemon dist/server.js",
 		"commands": "nodemon dist/service-commands.js"

@@ -1,18 +1,28 @@
-import { Redis } from 'ioredis';
-import { Card, Territories, WildCards } from '../rules';
-import { isEmpty } from '..';
-import { Status } from '.';
+import { Card, Continents, Continent, Territories, Territory } from '.';
+import { Status } from '../queries';
+
+export enum RuleTypes {
+	SETUP_TRADITIONAL, // Player take turns to claim territories during the setup phase
+	SETUP_RANDOM, // The system randomly assign initial territories to players
+};
 
 export interface Game {
 	token: string;
 	name: string;
 	host: string;
+	ruleType: RuleTypes;
 	round: number; // -1
 	redeemed: number; // 0
 	turns: number;
 	status: Status;
 	players: string[]; // use array because use this to also remember the order of turns
 	cards: Card[]; // the deck has to be shuffled, thus need array
+	world: Record<Continents, Continent>;
+	map: Record<Territories, Territory>;
+	lastBattle?: {
+		redDice: number[];
+		whiteDice: number[];
+	}
 };
 
 export const isGame = (variable: any): variable is Game => {

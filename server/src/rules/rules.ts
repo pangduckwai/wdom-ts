@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Card, Continent, Continents, Territory } from '.';
+import { Territories } from './territory';
 
 const MAX = 16777216; // Which is 0xffffff -> 3 bytes
 
@@ -8,13 +9,13 @@ export const rules = {
 	MaxPlayerPerGame: 6,
 	MaxCardsPerPlayer: 5,
 	chooseFirstPlayer: (players: number) => Math.floor(Math.random() * players) + 1,
-	basicReinforcement: (holdings: Record<string, Territory>) => {
-		const ret = Math.floor(Object.keys(holdings).length / 3);
+	basicReinforcement: (holdings: Territories[]) => {
+		const ret = Math.floor(holdings.length / 3);
 		return (ret < 3) ? 3 : ret;
 	},
-	continentReinforcement: (continents: Record<Continents, Continent>, holdings: Record<string, Territory>) => {
+	continentReinforcement: (continents: Record<Continents, Continent>, holdings: Territories[]) => {
 		return Object.values(continents).reduce((total, continent) => {
-			const owned = Object.values(holdings).filter(territory => territory.continent === continent.name).length;
+			const owned = holdings.filter(territory => continent.territories.has(territory)).length;
 			return total + ((owned === continent.territories.size) ? continent.reinforcement : 0);
 		}, 0);
 	},

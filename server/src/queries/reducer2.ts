@@ -1,7 +1,7 @@
 import { Commit, createCommit } from '../commands';
 import { generateToken } from '..';
-import { Card, rules, _shuffle, Territories, WildCards, Territory, Continents, Continent } from '../rules';
-import { buildMessage, Game, Message, MessageType, Player, Status } from '.';
+import { Card, Game, Player, rules, _shuffle, Territories, WildCards, Territory, Continents, Continent } from '../rules';
+import { buildMessage, Message, MessageType, Status } from '.';
 
 const turnStarted = (
 	world: Record<Continents, Continent>,
@@ -10,7 +10,6 @@ const turnStarted = (
 	gameToken: string
 ) => {
 	const playerToken = games[gameToken].players[games[gameToken].turns];
-	players[playerToken].holdingsCount = Object.keys(players[playerToken].holdings).length;
 
 	// ReinforcementArrived
 	players[playerToken].reinforcement =
@@ -18,28 +17,28 @@ const turnStarted = (
 		rules.continentReinforcement(world, players[playerToken].holdings);
 };
 
-const turnEnded = (
-	world: Record<Continents, Continent>,
-	players: Record<string, Player>,
-	games: Record<string, Game>,
-	playerToken: string,
-	gameToken: string
-) => {
-	const holdings = Object.keys(players[playerToken].holdings).length;
-	if (holdings > players[playerToken].holdingsCount) {
-		const card = games[gameToken].cards.pop();
-		if (card)
-			players[playerToken].cards[card.name] = card;
-		else
-			throw new Error(`No card left in the deck!!!`); // should be impossible to happen
-	}
-	games[gameToken].turns ++;
-	if (games[gameToken].turns >= games[gameToken].players.length) {
-		games[gameToken].turns = 0;
-		games[gameToken].round ++;
-	}
-	turnStarted(world, players, games, gameToken);
-};
+// const turnEnded = (
+// 	world: Record<Continents, Continent>,
+// 	players: Record<string, Player>,
+// 	games: Record<string, Game>,
+// 	playerToken: string,
+// 	gameToken: string
+// ) => {
+// 	const holdings = Object.keys(players[playerToken].holdings).length;
+// 	if (holdings > players[playerToken].holdingsCount) {
+// 		const card = games[gameToken].cards.pop();
+// 		if (card)
+// 			players[playerToken].cards[card.name] = card;
+// 		else
+// 			throw new Error(`No card left in the deck!!!`); // should be impossible to happen
+// 	}
+// 	games[gameToken].turns ++;
+// 	if (games[gameToken].turns >= games[gameToken].players.length) {
+// 		games[gameToken].turns = 0;
+// 		games[gameToken].round ++;
+// 	}
+// 	turnStarted(world, players, games, gameToken);
+// };
 
 // const troopPlaced = (
 // 	world: Record<Continents, Continent>,
@@ -177,11 +176,9 @@ export const reducer = (
 							players[commit.id] = {
 								token: commit.id,
 								name: event.payload.playerName,
-								selected: '',
 								reinforcement: 0,
 								status: Status.New,
-								holdings: {},
-								holdingsCount: 0,
+								holdings: [],
 								cards: {},
 								sessionid: generateToken()
 							};
@@ -201,34 +198,35 @@ export const reducer = (
 						}
 						break;
 
-					case 'GameOpened':
-						error = validate({ playerToken: event.payload.playerToken });
-						if (!error) {
-							if (Object.values(games).filter(game => game.name === event.payload.gameName).length > 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameName} already exists`));
-							} else {
-								const joined = players[event.payload.playerToken].joined;
-								if (joined) {
-									messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You already in the game ${games[joined].name} and cannot open a new one`));
-								} else {
-									games[commit.id] = {
-										token: commit.id,
-										name: event.payload.gameName,
-										host: event.payload.playerToken,
-										round: -2,
-										redeemed: 0,
-										turns: 0,
-										status: Status.New,
-										players: [event.payload.playerToken],
-										cards: []
-									};
-									players[event.payload.playerToken].joined = commit.id;
-								}
-							}
-						} else {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
-						}
-						break;
+					// case 'GameOpened':
+					// 	error = validate({ playerToken: event.payload.playerToken });
+					// 	if (!error) {
+					// 		if (Object.values(games).filter(game => game.name === event.payload.gameName).length > 0) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameName} already exists`));
+					// 		} else {
+					// 			const joined = players[event.payload.playerToken].joined;
+					// 			if (joined) {
+					// 				messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You already in the game ${games[joined].name} and cannot open a new one`));
+					// 			} else {
+					// 				games[commit.id] = {
+					// 					token: commit.id,
+					// 					name: event.payload.gameName,
+					// 					host: event.payload.playerToken,
+					// 					ruleType: event.payload.ruleType,
+					// 					round: -2,
+					// 					redeemed: 0,
+					// 					turns: 0,
+					// 					status: Status.New,
+					// 					players: [event.payload.playerToken],
+					// 					cards: []
+					// 				};
+					// 				players[event.payload.playerToken].joined = commit.id;
+					// 			}
+					// 		}
+					// 	} else {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+					// 	}
+					// 	break;
 
 					case 'GameClosed':
 						if (!players[event.payload.playerToken]) {
@@ -334,25 +332,25 @@ export const reducer = (
 					// 	}
 					// 	break;
 	
-					case 'TerritoryAssigned':
-						error = validate({ gameToken: event.payload.gameToken, territory: event.payload.territoryName, expected: GameStage.AfterStarted });
-						if (!error) {
-							const playerLen = games[event.payload.gameToken].players.length;
-							if (games[event.payload.gameToken].turns >= playerLen) {
-								games[event.payload.gameToken].turns = playerLen - 1; // Possibily someone just quit game
-							} else {
-								const playerToken = games[event.payload.gameToken].players[games[event.payload.gameToken].turns];
-								const player = players[playerToken];
-								const territory = map[event.payload.territoryName as Territories];
-								player.holdings[territory.name] = territory;
-								player.holdings[territory.name].troop = 1;
-								games[event.payload.gameToken].turns ++;
-								if (games[event.payload.gameToken].turns >= playerLen) games[event.payload.gameToken].turns = 0;
-							}
-						} else {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
-						}
-						break;
+					// case 'TerritoryAssigned':
+					// 	error = validate({ gameToken: event.payload.gameToken, territory: event.payload.territoryName, expected: GameStage.AfterStarted });
+					// 	if (!error) {
+					// 		const playerLen = games[event.payload.gameToken].players.length;
+					// 		if (games[event.payload.gameToken].turns >= playerLen) {
+					// 			games[event.payload.gameToken].turns = playerLen - 1; // Possibily someone just quit game
+					// 		} else {
+					// 			const playerToken = games[event.payload.gameToken].players[games[event.payload.gameToken].turns];
+					// 			const player = players[playerToken];
+					// 			const territory = map[event.payload.territoryName as Territories];
+					// 			player.holdings[territory.name] = territory;
+					// 			player.holdings[territory.name].troop = 1;
+					// 			games[event.payload.gameToken].turns ++;
+					// 			if (games[event.payload.gameToken].turns >= playerLen) games[event.payload.gameToken].turns = 0;
+					// 		}
+					// 	} else {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+					// 	}
+					// 	break;
 
 					// case 'MoveMade':
 					// 	// This is the event when a player click on the map, which depends on situation, will
@@ -443,103 +441,103 @@ export const reducer = (
 					// 	}
 					// 	break;
 
-					case 'TerritorySelected':
-						error = validate({
-							playerToken: event.payload.playerToken,
-							gameToken: event.payload.gameToken,
-							territory: event.payload.territoryName,
-							expected: GameStage.AfterGameSetup,
-						});
-						if (!error) {
-							if (!players[event.payload.playerToken].holdings[event.payload.territoryName]) {
-								messages.push(buildMessage(commit.id, MessageType.Message, event.type, `${event.payload.territoryName} is not your territory`));
-							} else {
-								players[event.payload.playerToken].selected = event.payload.territoryName;
-							}
-						} else {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
-						}
-						break;
+					// case 'TerritorySelected':
+					// 	error = validate({
+					// 		playerToken: event.payload.playerToken,
+					// 		gameToken: event.payload.gameToken,
+					// 		territory: event.payload.territoryName,
+					// 		expected: GameStage.AfterGameSetup,
+					// 	});
+					// 	if (!error) {
+					// 		if (!players[event.payload.playerToken].holdings[event.payload.territoryName]) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Message, event.type, `${event.payload.territoryName} is not your territory`));
+					// 		} else {
+					// 			players[event.payload.playerToken].selected = event.payload.territoryName;
+					// 		}
+					// 	} else {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+					// 	}
+					// 	break;
 
-					case 'TroopPlaced':
-						error = validate({
-							playerToken: event.payload.playerToken,
-							gameToken: event.payload.gameToken,
-							territory: event.payload.territoryName,
-							expected: GameStage.AfterGameSetup,
-						});
-						if (!error) {
-							if (!players[event.payload.playerToken].holdings[event.payload.territoryName]) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `This is not your territory`));
-							} else if (players[event.payload.playerToken].reinforcement < event.payload.amount) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Insufficient reinforcement left`));
-							} else {
-								if (players[event.payload.playerToken].reinforcement <= 0) {
-									messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Turn already started`));
-								} else {
-									if (event.payload.amount !== 0) {
-										// Both setup phase and game-play phase
-										players[event.payload.playerToken].holdings[event.payload.territoryName].troop += event.payload.amount;
-										players[event.payload.playerToken].reinforcement -= event.payload.amount;
-									}
-									if ((games[event.payload.gameToken].round === 0) && (event.payload.amount >= 0)) {
-										// Setup phase
-										// If player remove a troop from a territory, stay in that player's turn
-										games[event.payload.gameToken].turns ++;
-										if (games[event.payload.gameToken].turns >= games[event.payload.gameToken].players.length)
-											games[event.payload.gameToken].turns = 0;
+					// case 'TroopPlaced':
+					// 	error = validate({
+					// 		playerToken: event.payload.playerToken,
+					// 		gameToken: event.payload.gameToken,
+					// 		territory: event.payload.territoryName,
+					// 		expected: GameStage.AfterGameSetup,
+					// 	});
+					// 	if (!error) {
+					// 		if (!players[event.payload.playerToken].holdings[event.payload.territoryName]) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `This is not your territory`));
+					// 		} else if (players[event.payload.playerToken].reinforcement < event.payload.amount) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Insufficient reinforcement left`));
+					// 		} else {
+					// 			if (players[event.payload.playerToken].reinforcement <= 0) {
+					// 				messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Turn already started`));
+					// 			} else {
+					// 				if (event.payload.amount !== 0) {
+					// 					// Both setup phase and game-play phase
+					// 					players[event.payload.playerToken].holdings[event.payload.territoryName].troop += event.payload.amount;
+					// 					players[event.payload.playerToken].reinforcement -= event.payload.amount;
+					// 				}
+					// 				if ((games[event.payload.gameToken].round === 0) && (event.payload.amount >= 0)) {
+					// 					// Setup phase
+					// 					// If player remove a troop from a territory, stay in that player's turn
+					// 					games[event.payload.gameToken].turns ++;
+					// 					if (games[event.payload.gameToken].turns >= games[event.payload.gameToken].players.length)
+					// 						games[event.payload.gameToken].turns = 0;
 	
-										if (games[event.payload.gameToken].players.filter(k => players[k].reinforcement > 0).length <= 0) {
-											// SetupFinished
-											games[event.payload.gameToken].turns = 0;
-											games[event.payload.gameToken].round = 1;
-											turnStarted(world, players, games, event.payload.gameToken);
-										}
-									}
-								}
-							}
-						} else {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
-						}
-						break;
+					// 					if (games[event.payload.gameToken].players.filter(k => players[k].reinforcement > 0).length <= 0) {
+					// 						// SetupFinished
+					// 						games[event.payload.gameToken].turns = 0;
+					// 						games[event.payload.gameToken].round = 1;
+					// 						turnStarted(world, players, games, event.payload.gameToken);
+					// 					}
+					// 				}
+					// 			}
+					// 		}
+					// 	} else {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+					// 	}
+					// 	break;
 
-					case 'TerritoryAttacked':
-						error = validate({
-							playerToken: event.payload.fromPlayer,
-							playerToken2: event.payload.toPlayer,
-							gameToken: event.payload.gameToken,
-							territory: event.payload.fromTerritory,
-							territory2: event.payload.toTerritory,
-							expected: GameStage.AfterGamePlay,
-						});
-						if (!error) {
-							if (!players[event.payload.fromPlayer].holdings[event.payload.fromTerritory]) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Territory ${event.payload.fromTerritory} not owned by attacker`));
-							} else if (!players[event.payload.toPlayer].holdings[event.payload.toTerritory]) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Territory ${event.payload.toTerritory} not owned by defender`));
-							} else if (
-								(event.payload.attackerLoss < 0) || (event.payload.defenderLoss < 0) ||
-								((event.payload.attackerLoss === 0) && (event.payload.defenderLoss === 0))
-							) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Invalid inputs: attacker loss ${event.payload.attackerLoss} / defender loss ${event.payload.defenderLoss}`));
-							} else if (players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop <= event.payload.attackerLoss) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Attacker loss larger than attacker's troops number`));
-							} else {
-								players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop -= event.payload.attackerLoss;
-								if (players[event.payload.toPlayer].holdings[event.payload.toTerritory].troop > event.payload.defenderLoss)
-									players[event.payload.toPlayer].holdings[event.payload.toTerritory].troop -= event.payload.defenderLoss;
-								else {
-									// TerritoryConquered
-									delete players[event.payload.toPlayer].holdings[event.payload.toTerritory];
-									players[event.payload.fromPlayer].holdings[event.payload.toTerritory] = map[event.payload.toTerritory as Territories];
-									players[event.payload.fromPlayer].holdings[event.payload.toTerritory].troop = players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop - 1;
-									players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop = 1;
-								}
-							}
-						} else {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
-						}
-						break;
+					// case 'TerritoryAttacked':
+					// 	error = validate({
+					// 		playerToken: event.payload.fromPlayer,
+					// 		playerToken2: event.payload.toPlayer,
+					// 		gameToken: event.payload.gameToken,
+					// 		territory: event.payload.fromTerritory,
+					// 		territory2: event.payload.toTerritory,
+					// 		expected: GameStage.AfterGamePlay,
+					// 	});
+					// 	if (!error) {
+					// 		if (!players[event.payload.fromPlayer].holdings[event.payload.fromTerritory]) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Territory ${event.payload.fromTerritory} not owned by attacker`));
+					// 		} else if (!players[event.payload.toPlayer].holdings[event.payload.toTerritory]) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Territory ${event.payload.toTerritory} not owned by defender`));
+					// 		} else if (
+					// 			(event.payload.attackerLoss < 0) || (event.payload.defenderLoss < 0) ||
+					// 			((event.payload.attackerLoss === 0) && (event.payload.defenderLoss === 0))
+					// 		) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Invalid inputs: attacker loss ${event.payload.attackerLoss} / defender loss ${event.payload.defenderLoss}`));
+					// 		} else if (players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop <= event.payload.attackerLoss) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Attacker loss larger than attacker's troops number`));
+					// 		} else {
+					// 			players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop -= event.payload.attackerLoss;
+					// 			if (players[event.payload.toPlayer].holdings[event.payload.toTerritory].troop > event.payload.defenderLoss)
+					// 				players[event.payload.toPlayer].holdings[event.payload.toTerritory].troop -= event.payload.defenderLoss;
+					// 			else {
+					// 				// TerritoryConquered
+					// 				delete players[event.payload.toPlayer].holdings[event.payload.toTerritory];
+					// 				players[event.payload.fromPlayer].holdings[event.payload.toTerritory] = map[event.payload.toTerritory as Territories];
+					// 				players[event.payload.fromPlayer].holdings[event.payload.toTerritory].troop = players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop - 1;
+					// 				players[event.payload.fromPlayer].holdings[event.payload.fromTerritory].troop = 1;
+					// 			}
+					// 		}
+					// 	} else {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+					// 	}
+					// 	break;
 
 					// case 'TerritoryConquered':
 					// 	if (!players[event.payload.fromPlayer]) {
@@ -570,30 +568,30 @@ export const reducer = (
 					// 	}
 					// 	break;
 
-					case 'TerritoryFortified':
-						error = validate({
-							playerToken: event.payload.playerToken,
-							gameToken: event.payload.gameToken,
-							territory: event.payload.fromTerritory,
-							territory2: event.payload.toTerritory,
-							expected: GameStage.AfterGamePlay,
-						});
-						if (!error) {
-							if (!players[event.payload.playerToken].holdings[event.payload.fromTerritory]) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `${event.payload.fromTerritory} is not your territory`));
-							} else if (!players[event.payload.playerToken].holdings[event.payload.toTerritory]) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `${event.payload.toTerritory} is not your territory`));
-							} else if (event.payload.amount >= players[event.payload.playerToken].holdings[event.payload.fromTerritory].troop) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `${event.payload.fromTerritory} does not have enough troops to move`));
-							} else {
-								players[event.payload.playerToken].holdings[event.payload.fromTerritory].troop -= event.payload.amount;
-								players[event.payload.playerToken].holdings[event.payload.toTerritory].troop += event.payload.amount;
-								turnEnded(world, players, games, event.payload.playerToken, event.payload.gameToken)
-							}
-						} else {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
-						}
-						break;
+					// case 'TerritoryFortified':
+					// 	error = validate({
+					// 		playerToken: event.payload.playerToken,
+					// 		gameToken: event.payload.gameToken,
+					// 		territory: event.payload.fromTerritory,
+					// 		territory2: event.payload.toTerritory,
+					// 		expected: GameStage.AfterGamePlay,
+					// 	});
+					// 	if (!error) {
+					// 		if (!players[event.payload.playerToken].holdings[event.payload.fromTerritory]) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `${event.payload.fromTerritory} is not your territory`));
+					// 		} else if (!players[event.payload.playerToken].holdings[event.payload.toTerritory]) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `${event.payload.toTerritory} is not your territory`));
+					// 		} else if (event.payload.amount >= players[event.payload.playerToken].holdings[event.payload.fromTerritory].troop) {
+					// 			messages.push(buildMessage(commit.id, MessageType.Error, event.type, `${event.payload.fromTerritory} does not have enough troops to move`));
+					// 		} else {
+					// 			players[event.payload.playerToken].holdings[event.payload.fromTerritory].troop -= event.payload.amount;
+					// 			players[event.payload.playerToken].holdings[event.payload.toTerritory].troop += event.payload.amount;
+					// 			turnEnded(world, players, games, event.payload.playerToken, event.payload.gameToken)
+					// 		}
+					// 	} else {
+					// 		messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+					// 	}
+					// 	break;
 
 					case 'PlayerDefeated':
 						// TODO
@@ -606,7 +604,7 @@ export const reducer = (
 							expected: GameStage.AfterGameSetup,
 						});
 						if (!error) {
-							turnEnded(world, players, games, event.payload.playerToken, event.payload.gameToken);
+							//turnEnded(world, players, games, event.payload.playerToken, event.payload.gameToken);
 						} else {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						}

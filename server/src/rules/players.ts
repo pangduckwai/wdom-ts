@@ -1,17 +1,18 @@
-import { Card, Territory } from '../rules';
-import { Status } from '.';
+import { Card, Territory } from '.';
+import { Status } from '../queries';
+import { Territories } from './territory';
 
 export interface Player {
 	token: string;
 	name: string;
 	reinforcement: number; // 0
-	selected: string; // ''
+	selected?: Territories;
 	status: Status;
-	holdings: Record<string, Territory>;
-	holdingsCount: number; // 0
+	holdings: Territories[];
 	cards: Record<string, Card>;
 	joined?: string;
 	sessionid?: string;
+	wonBattle?: number;
 };
 
 export const isPlayer = (variable: any): variable is Player => {

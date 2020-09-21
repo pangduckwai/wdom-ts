@@ -1,3 +1,4 @@
+import { RuleTypes, Territories, WildCards } from "../rules";
 
 export interface BaseEvent {
 	readonly type: string;
@@ -25,6 +26,7 @@ export interface GameOpened extends BaseEvent {
 	payload: {
 		playerToken: string;
 		gameName: string;
+		ruleType: RuleTypes;
 	}
 }
 
@@ -64,7 +66,7 @@ export interface TerritoryAssigned extends BaseEvent {
 	payload: {
 		playerToken: string; // NOTE: this is the host's token starting a game (and assigning territories)
 		gameToken: string;
-		territoryName: string;
+		territory: Territories;
 	}
 }
 
@@ -77,14 +79,14 @@ export interface GameStarted extends BaseEvent {
 }
 // ************************
 
-// ********************************
+// *******************************
 // *** MakeMove derived events ***
 export interface TerritorySelected extends BaseEvent {
 	readonly type: 'TerritorySelected';
 	payload: {
 		playerToken: string;
 		gameToken: string;
-		territoryName: string;
+		territory: Territories;
 	}
 }
 
@@ -94,7 +96,7 @@ export interface TroopPlaced extends BaseEvent {
 	payload: {
 		playerToken: string;
 		gameToken: string;
-		territoryName: string;
+		territory: Territories;
 		amount: number;
 	}
 }
@@ -105,38 +107,37 @@ export interface TerritoryAttacked extends BaseEvent {
 		fromPlayer: string;
 		toPlayer: string;
 		gameToken: string;
-		fromTerritory: string;
-		toTerritory: string;
+		fromTerritory: Territories;
+		toTerritory: Territories;
 		redDice: number[];
 		whiteDice: number[];
 		attackerLoss: number;
 		defenderLoss: number;
 	}
 }
+// *******************************
 
-export interface TerritoryFortified extends BaseEvent {
-	readonly type: 'TerritoryFortified';
-	payload: {
-		playerToken: string;
-		gameToken: string;
-		fromTerritory: string;
-		toTerritory: string;
-		amount: number;
-	}
-}
-// ********************************
-
-// ********************************
+// ************************
 // *** Game play events ***
 export interface TurnEnded extends BaseEvent {
 	readonly type: 'TurnEnded';
 	payload: {
 		playerToken: string;
 		gameToken: string;
-		cardName?: string; // If entitled to draw a card at the end of the turn, remember the card
 	}
 }
-// ********************************
+
+export interface PositionFortified extends BaseEvent {
+	readonly type: 'PositionFortified';
+	payload: {
+		playerToken: string;
+		gameToken: string;
+		fromTerritory: Territories;
+		toTerritory: Territories;
+		amount: number;
+	}
+}
+// ************************
 
 // ********************
 // *** Cards events ***
@@ -146,7 +147,7 @@ export interface CardReturned extends BaseEvent {
 	payload: {
 		playerToken: string;
 		gameToken: string;
-		cardName: string;
+		card: WildCards | Territories;
 	}
 }
 
@@ -155,7 +156,7 @@ export interface CardsRedeemed extends BaseEvent {
 	payload: {
 		playerToken: string;
 		gameToken: string;
-		cardNames: string[];
+		cards: (WildCards | Territories)[];
 	}
 }
 // ********************
@@ -288,7 +289,7 @@ export interface CardsRedeemed extends BaseEvent {
 
 // export type Events =
 // 	PlayerRegistered | PlayerLeft | GameOpened | GameClosed | GameJoined | GameQuitted | GameStarted |
-// 	TerritoryAssigned | TerritorySelected | TerritoryAttacked | TerritoryConquered | TerritoryFortified |
+// 	TerritoryAssigned | TerritorySelected | TerritoryAttacked | TerritoryConquered | PositionFortified |
 // 	PlayerDefeated | TroopPlaced | TroopAdded | TroopDeployed | NextPlayer | SetupFinished | TurnEnded |
 // 	CardReturned | CardsRedeemed | GameWon
 // ;
