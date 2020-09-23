@@ -209,7 +209,7 @@ export const reducer = (
 							playerToken: event.payload.playerToken,
 							hostToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
-							// territory: event.payload.territoryName,
+							territory: event.payload.territory,
 							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
 						});
 						if (!error) {
@@ -235,7 +235,7 @@ export const reducer = (
 						error = validate({
 							playerToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
-							// cards: [event.payload.cardName]
+							cards: [event.payload.card]
 						});
 						if (!error) {
 							if (games[event.payload.gameToken].round < 0) {
@@ -292,7 +292,7 @@ export const reducer = (
 						error = validate({
 							playerToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
-							// territory: event.payload.territoryName,
+							territory: event.payload.territory,
 							expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameStarted }
 						});
 						if (!error) {
@@ -306,7 +306,7 @@ export const reducer = (
 						error = validate({
 							playerToken: event.payload.playerToken,
 							gameToken: event.payload.gameToken,
-							// territory: event.payload.territoryName,
+							territory: event.payload.territory,
 							expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameStarted }
 						});
 						if (!error) {

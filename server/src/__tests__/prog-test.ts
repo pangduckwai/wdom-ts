@@ -4,7 +4,7 @@ jest.mock('../commands/index');
 import crypto from 'crypto';
 import RedisClient, { Redis } from 'ioredis';
 import { CHANNEL, isEmpty } from '..';
-import { BusyTimeout } from '../commands';
+import { BusyTimeout, getCommitStore, CommitStore, createCommit, TerritorySelected } from '../commands';
 import { Status } from '../queries';
 import { buildWorld, buildDeck, buildMap, Card, Continents, Game, Player, _shuffle, shuffle, Territories, WildCards } from '../rules';
 
@@ -264,5 +264,17 @@ return count`;
 		expect(count).toEqual(5);
 		const result = await publisher.hgetall(`${topic}:Player`);
 		expect(result).toEqual({"X001":"Hello","X002":"There","X003":"How","X004":"Are","X005":"You?"});
+	});
+
+	it('test invalid territory name', async () => {
+		const func = (territoryName: string) => {
+			const commitStore: CommitStore = getCommitStore(topic, publisher);
+			return createCommit().addEvent<TerritorySelected>({
+				type: 'TerritorySelected',
+				payload: { playerToken: '12345', gameToken: '54321', territory: territoryName as Territories }
+			}).build(commitStore);
+		}
+		const result = await func('Lalaland');
+		console.log(JSON.stringify(result, null, ' '));
 	});
 });

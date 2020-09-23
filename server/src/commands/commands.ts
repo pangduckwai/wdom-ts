@@ -130,6 +130,7 @@ export const getCommands = (
 			const error = validator(players, games)({
 				playerToken,
 				gameToken,
+				territory: territoryName,
 				expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameStarted }
 			});
 			if (!error) {
@@ -168,7 +169,7 @@ export const getCommands = (
 
 					const notConnect = validator(players, games)({
 						territory: player.selected,
-						territory2: territoryName as Territories
+						territory2: territoryName
 					});
 					if (!notConnect) {
 						const defenderToken = game.players.find(p => players[p].holdings.includes(territoryName as Territories));
@@ -245,6 +246,7 @@ export const getCommands = (
 			const error = validator(players, games)({
 				playerToken,
 				gameToken,
+				territory: territoryName,
 				expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameInProgress }
 			});
 			if (!error) {
@@ -255,7 +257,7 @@ export const getCommands = (
 							(player.holdings.filter(t => t === player.selected).length > 0)) {
 						const notConnect = validator(players, games)({
 							territory: player.selected,
-							territory2: territoryName as Territories
+							territory2: territoryName
 						});
 						if (!notConnect) {
 							return createCommit().addEvent<PositionFortified>({

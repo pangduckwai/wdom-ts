@@ -29,31 +29,31 @@ export const getValidator = (
     games: Record<string, Game>,
   ) => {
     return ({
-      playerToken, playerToken2, hostToken, gameToken, territory, territory2, expectedStage
+      playerToken, playerToken2, hostToken, gameToken, territory, territory2, cards, expectedStage
     }: {
       playerToken?: string;
       playerToken2?: string;
       hostToken?: string;
       gameToken?: string;
-      territory?: Territories;
-      territory2?: Territories;
-      // cards?: (WildCards | Territories)[];
+      territory?: string;
+      territory2?: string;
+      cards?: string[];
       expectedStage?: { expected: Expected, stage: GameStage; };
     }) => {
       if (playerToken && !players[playerToken]) return `Player "${playerToken}" not found`;
       if (playerToken2 && !players[playerToken2]) return `Player "${playerToken2}" not found`;
       if (hostToken && !players[hostToken]) return `Player "${hostToken}" not found`;
-      // if (territory && !map[territory]) return `Unknown territory "${territory}"`;
-      // if (territory2 && !map[territory2]) return `Unknown territory "${territory2}"`;
+      if (territory && !map[territory as Territories]) return `Unknown territory "${territory}"`;
+      if (territory2 && !map[territory2 as Territories]) return `Unknown territory "${territory2}"`;
       if (territory && territory2) {
-        if (!map[territory].connected.has(territory2))
+        if (!map[territory as Territories].connected.has(territory2 as Territories))
           return `Territories "${territory}" and "${territory2}" are not connected`;
       }
-      // if (cards) {
-      //   for (const card of cards) {
-      //     if (!deck[card]) return `Invalid card "${card}"`;
-      //   }
-      // }
+      if (cards) {
+        for (const card of cards) {
+          if (!deck[card as (WildCards | Territories)]) return `Invalid card "${card}"`;
+        }
+      }
 
       if (gameToken) {
         const game = games[gameToken];
