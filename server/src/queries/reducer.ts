@@ -7,6 +7,33 @@ import {
 } from '../rules';
 import { buildMessage, Message, MessageType, Status } from '.';
 
+const nextPlayer = (
+	players: Record<string, Player>,
+	games: Record<string, Game>,
+	gameToken: string
+) => {
+	const curr = games[gameToken].turns;
+	let wrapped = false;
+	do {
+		games[gameToken].turns ++;
+		if (games[gameToken].turns >= games[gameToken].players.length) {
+			games[gameToken].turns = 0;
+			wrapped = true;
+		}
+	} while (
+		(players[games[gameToken].players[games[gameToken].turns]].status !== Status.Invalid) && // 'Invalid' means defeated for players
+		(games[gameToken].turns !== curr) // Extra checking to avoid infinite loop, when turn go back to the curr player, his/her status should still be valid
+	);
+
+	if (games[gameToken].turns === curr) {
+		return -1; // Game finsihed!!!
+	} else if (wrapped) {
+		return 1; // Next round
+	} else {
+		return 0;
+	}
+};
+
 const turnStarted = (
 	world: Record<Continents, Continent>,
 	players: Record<string, Player>,
@@ -31,11 +58,12 @@ const turnEnded = (
 		const card = games[gameToken].cards.pop();
 		if (card) players[playerToken].cards[card?.name] = card;
 	}
-	games[gameToken].turns ++;
-	if (games[gameToken].turns >= games[gameToken].players.length) {
-		games[gameToken].turns = 0;
-		games[gameToken].round ++;
-	}
+	// games[gameToken].turns ++;
+	// if (games[gameToken].turns >= games[gameToken].players.length) {
+	// 	games[gameToken].turns = 0;
+	// 	games[gameToken].round ++;
+	// }
+	if (nextPlayer(players, games, gameToken) === 1) games[gameToken].round ++; // NOTE! Replace the above 5 lines with this one!
 };
 
 export const reducer = (
@@ -222,10 +250,11 @@ export const reducer = (
 							});
 						}
 						if (!error) {
-							const playerLen = games[event.payload.gameToken].players.length;
-							if (games[event.payload.gameToken].turns >= playerLen) {
-								games[event.payload.gameToken].turns = playerLen - 1; // Possibily someone just quit game
-							} else if (games[event.payload.gameToken].players.length < rules.MinPlayerPerGame) {
+							// const playerLen = games[event.payload.gameToken].players.length;
+							// if (games[event.payload.gameToken].turns >= playerLen) {
+							// 	games[event.payload.gameToken].turns = playerLen - 1; // Possibily someone just quit game
+							// } else 
+							if (games[event.payload.gameToken].players.length < rules.MinPlayerPerGame) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Not enough players in the game "${games[event.payload.gameToken].name}" yet`));
 							} else {
 								const playerToken = games[event.payload.gameToken].players[games[event.payload.gameToken].turns];
@@ -233,8 +262,9 @@ export const reducer = (
 								player.holdings.push(event.payload.territory as Territories);
 								games[event.payload.gameToken].map[event.payload.territory as Territories].troop = 1;
 								if (games[event.payload.gameToken].ruleType === RuleTypes.SETUP_TRADITIONAL) player.reinforcement --;
-								games[event.payload.gameToken].turns ++;
-								if (games[event.payload.gameToken].turns >= playerLen) games[event.payload.gameToken].turns = 0;
+								// games[event.payload.gameToken].turns ++;
+								// if (games[event.payload.gameToken].turns >= playerLen) games[event.payload.gameToken].turns = 0;
+								nextPlayer(players, games, event.payload.gameToken); // NOTE! Replace the above 2 lines with this one!
 							}
 						} else {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
@@ -339,9 +369,10 @@ export const reducer = (
 										let count = 0;
 										do {
 											count ++;
-											games[event.payload.gameToken].turns ++;
-											if (games[event.payload.gameToken].turns >= games[event.payload.gameToken].players.length)
-												games[event.payload.gameToken].turns = 0;
+											// games[event.payload.gameToken].turns ++;
+											// if (games[event.payload.gameToken].turns >= games[event.payload.gameToken].players.length)
+											// 	games[event.payload.gameToken].turns = 0;
+											nextPlayer(players, games, event.payload.gameToken); // NOTE! Replace the above 3 lines with this one!
 										} while (
 											(players[games[event.payload.gameToken].players[games[event.payload.gameToken].turns]].reinforcement <= 0) &&
 											(count < games[event.payload.gameToken].players.length)
@@ -393,7 +424,15 @@ export const reducer = (
 									games[payload0.gameToken].map[payload0.fromTerritory].troop = 1;
 									players[payload0.fromPlayer].wonBattle = games[payload0.gameToken].round;
 
-									// TODO: Check if toPlayer lost all holdings
+									if (players[payload0.toPlayer].holdings.length <= 0) {
+										// Player defeated!!!
+										players[payload0.toPlayer].status = Status.Invalid;
+										players[payload0.fromPlayer].cards = {
+											...players[payload0.fromPlayer].cards,
+											...players[payload0.toPlayer].cards
+										};
+										players[payload0.toPlayer].cards = {};
+									}
 								}
 							}
 						} else {

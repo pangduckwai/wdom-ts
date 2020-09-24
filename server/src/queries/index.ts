@@ -17,5 +17,5 @@ export const getToken = (input?: Game | Player | string) => {
 };
 
 export enum Status {
-  Deleted, New, Ready
+  Deleted, New, Ready, Invalid
 };
