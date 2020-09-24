@@ -67,7 +67,7 @@ export const rules = {
 		let white = [5,4];
 		if (defender === 1)
 			white = [4];
-		else if ((attacker - defender) > 5)
+		else if (attacker === 5)
 			white = [4,4];
 
 		let casualties = { attacker: 0, defender: 0, red, white };

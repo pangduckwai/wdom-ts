@@ -140,12 +140,23 @@ export const getCommands = (
 					type: 'TerritorySelected',
 					payload: { playerToken, gameToken, territory: territoryName as Territories }
 				});
-				if (player.holdings.filter(t => t === territoryName).length > 0) {
+				if (game.map[territoryName as Territories].troop <= 0) {
+					// Clicking on unclaimed territory
+					if (game.round === 0) {
+						addEvent<TerritoryAssigned>({
+							type: 'TerritoryAssigned',
+							payload: { playerToken, gameToken, territory: territoryName as Territories }
+						});
+					}
+				} else if (player.holdings.filter(t => t === territoryName).length > 0) {
 					// Clicking on the player's own territory
 					const flagAll = (flag & FLAG_ALT) > 0; // place all remaining troops at once
 					const flagDdc = (flag & FLAG_SHIFT) > 0; // subtract troop
-					if ((game.round > 0) || (game.ruleType === RuleTypes.SETUP_RANDOM)) {
-						if (player.reinforcement > 0) { // for both game.round == 0 or > 0
+					if (player.reinforcement > 0) {
+						const unclaimed = Object.values(game.map).filter(t => t.troop <= 0).length;
+						if ((game.round > 0) || // After setup phase
+								(game.ruleType === RuleTypes.SETUP_RANDOM) || // Setup phase (game.round == 0) using random assign initial territories rule
+								(unclaimed <= 0)) { // Setup phase, all territories claimed, traditional rule
 							addEvent<TroopPlaced>({
 								type: 'TroopPlaced',
 								payload: {
@@ -153,10 +164,12 @@ export const getCommands = (
 									amount: (flagAll) ? player.reinforcement : (flagDdc) ? -1 : 1
 								}
 							});
-						}
-					} else { // game.round == 0 and rule == SETUP_TRADITIONAL
-						if (player.reinforcement > 0) {
-							// TODO HERE!!!!!!!!!!!!!
+						} else {
+							if (unclaimed > 0) {
+								return new Promise<Commit>((_, reject) => {
+									reject(new Error(`[commands.MakeMove] please claim all territories first`));
+								});
+							}
 						}
 					}
 				} else {

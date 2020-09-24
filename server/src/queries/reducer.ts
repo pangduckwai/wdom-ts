@@ -3,7 +3,7 @@ import { generateToken } from '..';
 import {
 	buildMap, buildWorld,
 	Card, Game, Player, rules, _shuffle, Territories, WildCards, Territory,
-	Continents, Continent, getValidator, GameStage, Expected
+	Continents, Continent, getValidator, GameStage, Expected, RuleTypes
 } from '../rules';
 import { buildMessage, Message, MessageType, Status } from '.';
 
@@ -205,13 +205,22 @@ export const reducer = (
 						break;
 
 					case 'TerritoryAssigned':
-						error = validate({
-							playerToken: event.payload.playerToken,
-							hostToken: event.payload.playerToken,
-							gameToken: event.payload.gameToken,
-							territory: event.payload.territory,
-							expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
-						});
+						if (games[event.payload.gameToken].ruleType === RuleTypes.SETUP_RANDOM) {
+							error = validate({
+								playerToken: event.payload.playerToken,
+								hostToken: event.payload.playerToken,
+								gameToken: event.payload.gameToken,
+								territory: event.payload.territory,
+								expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
+							});
+						} else {
+							error = validate({
+								playerToken: event.payload.playerToken,
+								gameToken: event.payload.gameToken,
+								territory: event.payload.territory,
+								expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameStarted }
+							});
+						}
 						if (!error) {
 							const playerLen = games[event.payload.gameToken].players.length;
 							if (games[event.payload.gameToken].turns >= playerLen) {
@@ -223,6 +232,7 @@ export const reducer = (
 								const player = players[playerToken];
 								player.holdings.push(event.payload.territory as Territories);
 								games[event.payload.gameToken].map[event.payload.territory as Territories].troop = 1;
+								if (games[event.payload.gameToken].ruleType === RuleTypes.SETUP_TRADITIONAL) player.reinforcement --;
 								games[event.payload.gameToken].turns ++;
 								if (games[event.payload.gameToken].turns >= playerLen) games[event.payload.gameToken].turns = 0;
 							}
