@@ -15,7 +15,3 @@ export const getToken = (input?: Game | Player | string) => {
   else
     throw Error('[getToken] Invalid input type');
 };
-
-export enum Status {
-  Deleted, New, Ready, Invalid
-};

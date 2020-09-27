@@ -22,3 +22,7 @@ export const generateToken = () =>
 export const FLAG_SHIFT = 1; // 0001
 export const FLAG_ALT = 2;   // 0010
 export const FLAG_CTRL = 4;  // 0100
+
+export enum Status {
+  Deleted, New, Ready, Invalid
+};

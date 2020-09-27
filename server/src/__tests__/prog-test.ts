@@ -3,9 +3,8 @@ jest.mock('../rules/card');
 jest.mock('../commands/index');
 import crypto from 'crypto';
 import RedisClient, { Redis } from 'ioredis';
-import { CHANNEL, isEmpty } from '..';
+import { CHANNEL, isEmpty, Status } from '..';
 import { BusyTimeout, getCommitStore, CommitStore, createCommit, TerritorySelected } from '../commands';
-import { Status } from '../queries';
 import { buildWorld, buildDeck, buildMap, Card, Continents, Game, Player, _shuffle, shuffle, Territories, WildCards } from '../rules';
 
 const host = process.env.REDIS_HOST;

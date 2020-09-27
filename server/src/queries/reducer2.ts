@@ -1,7 +1,7 @@
 import { Commit, createCommit } from '../commands';
-import { generateToken } from '..';
+import { generateToken, Status } from '..';
 import { Card, Game, Player, rules, _shuffle, Territories, WildCards, Territory, Continents, Continent } from '../rules';
-import { buildMessage, Message, MessageType, Status } from '.';
+import { buildMessage, Message, MessageType } from '.';
 
 const turnStarted = (
 	world: Record<Continents, Continent>,

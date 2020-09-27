@@ -1,6 +1,9 @@
 import { Redis } from 'ioredis';
 import { getSnapshot } from '../queries';
-import { _shuffle, rules, Card, Territories, Territory, WildCards, getValidator, GameStage, Expected, RuleTypes } from '../rules';
+import {
+	_shuffle, rules, Card, Territories, Territory, WildCards, GameStage, Expected, RuleTypes,
+	getValidator, validateNumOfPlayers
+} from '../rules';
 import { FLAG_SHIFT, FLAG_ALT } from '..';
 import {
 	Commit, CommitStore, createCommit, getCommitStore,
@@ -74,17 +77,18 @@ export const getCommands = (
 			}).build(commitStore),
 		StartGame: async (payload: { playerToken: string; gameToken: string }) => {
 			const { players, games } = await snapshot.read();
-			const error = validator(players, games)({
+			let error = validator(players, games)({
 				playerToken: payload.playerToken,
 				hostToken: payload.playerToken,
 				gameToken: payload.gameToken,
 				expectedStage: { expected: Expected.OnOrBefore, stage: GameStage.GameOpened }
 			});
-			if (!error) {
-				if (games[payload.gameToken].players.length < rules.MinPlayerPerGame) {
-					return new Promise<Commit>((_, reject) => {
-						reject(new Error(`[commands.StartGame] Not enough players in the game "${games[payload.gameToken].name}" yet`));
-					});
+			if (error) {
+				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.StartGame] ${error}`)));
+			} else {
+				error = validateNumOfPlayers(players, games[payload.gameToken]);
+				if (error) {
+					return new Promise<Commit>((_, reject) => reject(new Error(error)));
 				} else {
 					const tokens: string[] = _shuffle(games[payload.gameToken].players);
 					// Need to do these here because need to record player orders, territory assigned, and cards, in a event, otherwise cannot replay
@@ -115,10 +119,6 @@ export const getCommands = (
 					});
 					return build(commitStore);
 				}
-			} else {
-				return new Promise<Commit>((_, reject) => {
-					reject(new Error(`[commands.StartGame] ${error}`));
-				});
 			}
 		},
 		MakeMove: async ({
@@ -133,7 +133,9 @@ export const getCommands = (
 				territory: territoryName,
 				expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameStarted }
 			});
-			if (!error) {
+			if (error) {
+				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] ${error}`)));
+			} else {
 				const player = players[playerToken];
 				const game = games[gameToken];
 				const { build, addEvent } = createCommit().addEvent<TerritorySelected>({
@@ -166,25 +168,23 @@ export const getCommands = (
 							});
 						} else {
 							if (unclaimed > 0) {
-								return new Promise<Commit>((_, reject) => {
-									reject(new Error(`[commands.MakeMove] please claim all territories first`));
-								});
+								return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] please claim all territories first`)));
 							}
 						}
 					}
 				} else {
 					// Clicking on other players territory
 					if (player.reinforcement > 0) {
-						return new Promise<Commit>((_, reject) => {
-							reject(new Error(`[commands.MakeMove] turn setup not ready`));
-						});
+						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] turn setup not ready`)));
 					}
 
 					const notConnect = validator(players, games)({
 						territory: player.selected,
 						territory2: territoryName
 					});
-					if (!notConnect) {
+					if (notConnect) {
+						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] ${notConnect}`)));
+					} else {
 						const defenderToken = game.players.find(p => players[p].holdings.includes(territoryName as Territories));
 						if (defenderToken) {
 							if (player.selected) {
@@ -207,31 +207,17 @@ export const getCommands = (
 										}
 									});
 								} else {
-									return new Promise<Commit>((_, reject) => {
-										reject(new Error(`[commands.MakeMove] insufficient troops to initiate an attack`));
-									});
+									return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] insufficient troops to initiate an attack`)));
 								}
 							} else {
-								return new Promise<Commit>((_, reject) => {
-									reject(new Error(`[commands.MakeMove] player must select a territory to attack from`));
-								});
+								return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] player must select a territory to attack from`)));
 							}
-						} else {
-							return new Promise<Commit>((_, reject) => {
-								reject(new Error(`[commands.MakeMove] unable to find owner of ${territoryName}`));
-							}); // should not be possible to get here
+						} else { // should not be possible to get here
+							return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] unable to find owner of ${territoryName}`)));
 						}
-					} else {
-						return new Promise<Commit>((_, reject) => {
-							reject(new Error(`[commands.MakeMove] ${notConnect}`));
-						});
 					}
 				}
 				return build(commitStore);
-			} else {
-				return new Promise<Commit>((_, reject) => {
-					reject(new Error(`[commands.MakeMove] ${error}`));
-				});
 			}
 		},
 		EndTurn: async ({ playerToken, gameToken }: { playerToken: string; gameToken: string }) => {
@@ -241,15 +227,13 @@ export const getCommands = (
 				gameToken,
 				expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameInProgress }
 			});
-			if (!error) {
+			if (error) {
+				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.EndTurn] ${error}`)));
+			} else {
 				return createCommit().addEvent<TurnEnded>({
 					type: 'TurnEnded',
 					payload: { playerToken, gameToken }
 				}).build(commitStore);
-			} else {
-				return new Promise<Commit>((_, reject) => {
-					reject(new Error(`[commands.EndTurn] ${error}`));
-				});
 			}
 		},
 		FortifyPosition: async ({ playerToken, gameToken, territoryName, amount }: {
@@ -262,7 +246,9 @@ export const getCommands = (
 				territory: territoryName,
 				expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameInProgress }
 			});
-			if (!error) {
+			if (error) {
+				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.FortifyPosition] ${error}`)));
+			} else {
 				const player = players[playerToken];
 				const game = games[gameToken];
 				if (player.selected) {
@@ -272,30 +258,20 @@ export const getCommands = (
 							territory: player.selected,
 							territory2: territoryName
 						});
-						if (!notConnect) {
+						if (notConnect) {
+							return new Promise<Commit>((_, reject) => reject(new Error(`[commands.FortifyPosition] ${notConnect}`)));
+						} else {
 							return createCommit().addEvent<PositionFortified>({
 								type: 'PositionFortified',
 								payload: { playerToken, gameToken, fromTerritory: player.selected, toTerritory: territoryName as Territories, amount }
 							}).build(commitStore);
-						} else {
-							return new Promise<Commit>((_, reject) => {
-								reject(new Error(`[commands.FortifyPosition] ${notConnect}`));
-							});
 						}
 					} else {
-						return new Promise<Commit>((_, reject) => {
-							reject(new Error(`[commands.FortifyPosition] cannot fortify other player's position`));
-						});
+						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.FortifyPosition] cannot fortify other player's position`)));
 					}
 				} else {
-					return new Promise<Commit>((_, reject) => {
-						reject(new Error(`[commands.MakeMove] player must select a territory to move troops from`));
-					});
+					return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] player must select a territory to move troops from`)));
 				}
-			} else {
-				return new Promise<Commit>((_, reject) => {
-					reject(new Error(`[commands.FortifyPosition] ${error}`));
-				});
 			}
 		},
 		// FinishSetup: (payload: { playerToken: string; gameToken: string }) =>

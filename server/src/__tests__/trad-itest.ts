@@ -566,8 +566,8 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 		expect(reports.games[gameToken].map['Brazil'].troop).toEqual(5);
 	});
 
-	it('4th player play out the wnd turn', async () => {
-		const targets = ['East-Africa', 'Middle-East', 'India', 'Afghanistan', 'Ural', 'Yakutsk'];
+	it('4th player play out the 2nd turn', async () => {
+		const targets = ['East-Africa', 'Middle-East', 'India', 'Afghanistan', 'Ural', 'Siberia', 'Yakutsk'];
 		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
 		for (const target of targets) {
 			await commands.MakeMove({

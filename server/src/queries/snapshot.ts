@@ -1,7 +1,6 @@
 import { Redis } from 'ioredis';
 import { Game, Player, isGame, isPlayer } from '../rules';
-import { deserialize } from '..';
-import { Status } from '.';
+import { deserialize, Status } from '..';
 
 // KEYS[1]  - Player snapshots
 // KEYS[2]  - Game snapshots

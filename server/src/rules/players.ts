@@ -1,6 +1,5 @@
-import { Card, Territory } from '.';
-import { Status } from '../queries';
-import { Territories } from './territory';
+import { Card, Territories } from '.';
+import { Status } from '..';
 
 export interface Player {
 	token: string;

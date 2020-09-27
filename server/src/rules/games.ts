@@ -1,5 +1,5 @@
 import { Card, Continents, Continent, Territories, Territory } from '.';
-import { Status } from '../queries';
+import { Status } from '..';
 
 export enum RuleTypes {
 	SETUP_TRADITIONAL, // Player take turns to claim territories during the setup phase
