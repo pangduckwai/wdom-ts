@@ -567,20 +567,37 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 	});
 
 	it('4th player play out the 2nd turn', async () => {
-		const targets = ['East-Africa', 'Middle-East', 'India', 'Afghanistan', 'Ural', 'Siberia', 'Yakutsk'];
+		const targets = ['East-Africa', 'Middle-East', 'India', 'Afghanistan', 'Ural', 'Siberia', 'Yakutsk', 'Kamchatka'];
 		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
 		for (const target of targets) {
 			await commands.MakeMove({
 				playerToken, gameToken, territoryName: target, flag: 2
 			});
 		}
-		// await commands.FortifyPosition({
-		// 	playerToken, gameToken, territoryName: 'East-Africa', amount: 9
-		// });
+		await commands.EndTurn({
+			playerToken, gameToken
+		});
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		// expect(reports.players[playerToken].selected).toEqual('East-Africa');
-		// expect(reports.games[gameToken].map['East-Africa'].troop).toEqual(10);
+		expect(reports.players[playerToken].selected).toEqual('Kamchatka');
+		expect(reports.games[gameToken].map['Kamchatka'].troop).toEqual(6);
+	});
+
+	it('5th player play out the 2nd turn', async () => {
+		const targets = ['Greenland', 'Iceland'];
+		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
+		for (const target of targets) {
+			await commands.MakeMove({
+				playerToken, gameToken, territoryName: target, flag: 2
+			});
+		}
+		await commands.EndTurn({
+			playerToken, gameToken
+		});
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.players[playerToken].selected).toEqual('Iceland');
+		expect(reports.games[gameToken].map['Iceland'].troop).toEqual(3);
 	});
 
 });

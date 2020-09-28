@@ -134,17 +134,14 @@ export const getValidator = (
 	};
 };
 
-export const validateNumOfPlayers = (players: Record<string, Player>, game: Game, checkFull = false) => {
-	const playerCnt = game.players.filter(p => (players[p].status !== Status.Invalid)).length;
-	if (playerCnt < rules.MinPlayerPerGame) {
+export const validateNumOfPlayers = (players: Record<string, Player>, game: Game, option: {checkLack?: boolean, checkFull?: boolean}) => {
+	const playerCnt = game.players.filter(p => players[p].status !== Status.Invalid).length;
+	if ((playerCnt < rules.MinPlayerPerGame) && option.checkLack) {
 		return `Not enough players in the game "${game.name}" yet`;
-	} else if (playerCnt === rules.MaxPlayerPerGame) {
-		if (checkFull)
-			return `Game "${game.name}" already full`;
-		else
-			return undefined;
-	} else if (playerCnt > rules.MaxPlayerPerGame) {
-		return `Too many players in the game "${game.name}" already`;
+	} else if ((playerCnt >= rules.MaxPlayerPerGame) && option.checkFull) {
+		return `Game "${game.name}" already full`;
+	// } else if (playerCnt > rules.MaxPlayerPerGame) {
+	// 	return `Too many players in the game "${game.name}" already`;
 	} else {
 		return undefined;
 	}

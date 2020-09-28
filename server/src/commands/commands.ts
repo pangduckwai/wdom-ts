@@ -4,7 +4,7 @@ import {
 	_shuffle, rules, Card, Territories, Territory, WildCards, GameStage, Expected, RuleTypes,
 	getValidator, validateNumOfPlayers
 } from '../rules';
-import { FLAG_SHIFT, FLAG_ALT } from '..';
+import { FLAG_SHIFT, FLAG_ALT, Status } from '..';
 import {
 	Commit, CommitStore, createCommit, getCommitStore,
 	PlayerRegistered, PlayerLeft,
@@ -86,7 +86,7 @@ export const getCommands = (
 			if (error) {
 				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.StartGame] ${error}`)));
 			} else {
-				error = validateNumOfPlayers(players, games[payload.gameToken]);
+				error = validateNumOfPlayers(players, games[payload.gameToken], { checkLack: true });
 				if (error) {
 					return new Promise<Commit>((_, reject) => reject(new Error(error)));
 				} else {

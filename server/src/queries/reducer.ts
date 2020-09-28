@@ -36,7 +36,7 @@ const turnEnded = (
 	let wrapped = false;
 	do {
 		games[gameToken].turns ++;
-		if (games[gameToken].turns >= games[gameToken].players.length) {
+		if (games[gameToken].turns >= games[gameToken].players.length) { // don't need to filter player list here
 			games[gameToken].turns = 0;
 			wrapped = true;
 		}
@@ -177,7 +177,7 @@ export const reducer = (
 							}if (players[event.payload.playerToken].joined) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You already joined game "${players[event.payload.playerToken].joined}"`));
 							} else {
-								error = validateNumOfPlayers(players, games[event.payload.gameToken], true);
+								error = validateNumOfPlayers(players, games[event.payload.gameToken], { checkFull: true });
 								if (error) {
 									messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 								} else {
@@ -215,7 +215,7 @@ export const reducer = (
 						if (error) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else {
-							error = validateNumOfPlayers(players, games[event.payload.gameToken]);
+							error = validateNumOfPlayers(players, games[event.payload.gameToken], { checkLack: true });
 							if (error) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 							} else {
@@ -244,7 +244,7 @@ export const reducer = (
 						if (error) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else {
-							error = validateNumOfPlayers(players, games[event.payload.gameToken]);
+							error = validateNumOfPlayers(players, games[event.payload.gameToken], { checkLack: true });
 							if (error) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 							} else {
@@ -302,7 +302,7 @@ export const reducer = (
 						if (error) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else {
-							error = validateNumOfPlayers(players, games[event.payload.gameToken]);
+							error = validateNumOfPlayers(players, games[event.payload.gameToken], { checkLack: true });
 							if (error) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 							} else {
@@ -350,7 +350,7 @@ export const reducer = (
 								games[event.payload.gameToken].map[event.payload.territory as Territories].troop += event.payload.amount;
 								players[event.payload.playerToken].reinforcement -= event.payload.amount;
 								if (games[event.payload.gameToken].round === 0) {
-									// Setup phase
+									// Setup phase, don't need to filter player list using Status here!!!
 									if (games[event.payload.gameToken].players.filter(p => players[p].reinforcement > 0).length <= 0) {
 										// Setup phase done, move to first player's first turn
 										games[event.payload.gameToken].round = 1;
