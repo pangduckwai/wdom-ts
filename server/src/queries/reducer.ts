@@ -1,4 +1,4 @@
-import { Commit, PositionFortified, TerritoryAttacked } from '../commands';
+import { Commit, PositionFortified, TerritoryAttacked, CardsRedeemed } from '../commands';
 import { generateToken, Status } from '..';
 import {
 	buildMap, buildWorld,
@@ -29,7 +29,7 @@ const turnEnded = (
 	gameToken: string
 ) => {
 	if (players[playerToken].wonBattle === games[gameToken].round) {
-		const card = games[gameToken].cards.pop();
+		const card = games[gameToken].cards.shift();
 		if (card) players[playerToken].cards[card?.name] = card;
 	}
 	const curr = games[gameToken].turns;
@@ -260,38 +260,6 @@ export const reducer = (
 						}
 						break;
 
-					case 'CardReturned':
-						error = validate({
-							playerToken: event.payload.playerToken,
-							gameToken: event.payload.gameToken,
-							cards: [event.payload.card]
-						});
-						if (error) {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
-						} else {
-							if (games[event.payload.gameToken].round < 0) {
-								// From StartGame
-								if (games[event.payload.gameToken].host !== event.payload.playerToken) {
-									messages.push(buildMessage(
-										commit.id, MessageType.Error, event.type,
-										`Player "${players[event.payload.playerToken].name}" is not the host of game "${games[event.payload.gameToken].name}"`
-									));
-									break;
-								}
-							} else if (games[event.payload.gameToken].round === 0) {
-								// Error
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Event "CardReturned" is invalid during game setup phase`));
-								break;
-							}
-
-							if (games[event.payload.gameToken].cards.filter(c => c.name === event.payload.card).length > 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.card}" already in the deck`));
-							} else {
-								games[event.payload.gameToken].cards.push(deck[event.payload.card as Territories | WildCards]);
-							}
-						}
-						break;
-
 					case 'GameStarted':
 						error = validate({
 							playerToken: event.payload.playerToken,
@@ -437,6 +405,8 @@ export const reducer = (
 						});
 						if (error) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+						} else if (players[event.payload.playerToken].reinforcement > 0) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `All reinforcement need to be deployed before ending a turn`));
 						} else {
 							turnEnded(players, games, event.payload.playerToken, event.payload.gameToken);
 							turnStarted(world, players, games, event.payload.gameToken); // TODO: need to check end-game condition?
@@ -454,6 +424,8 @@ export const reducer = (
 						});
 						if (error) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+						} else if (players[event.payload.playerToken].reinforcement > 0) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `All reinforcement need to be deployed before fortification`));
 						} else {
 							if ((players[payload1.playerToken].holdings.filter(t => t === payload1.toTerritory).length <= 0) ||
 									(players[payload1.playerToken].holdings.filter(t => t === payload1.fromTerritory).length <= 0)) {
@@ -468,6 +440,56 @@ export const reducer = (
 								players[payload1.playerToken].selected = payload1.toTerritory;
 								turnEnded(players, games, payload1.playerToken, payload1.gameToken);
 								turnStarted(world, players, games, payload1.gameToken); // TODO: need to check end-game condition?
+							}
+						}
+						break;
+
+					case 'CardReturned':
+						if (games[event.payload.gameToken].round < 0) { // from StartGame
+							error = validate({
+								playerToken: event.payload.playerToken,
+								hostToken: event.payload.playerToken,
+								gameToken: event.payload.gameToken,
+								card: event.payload.card
+							});
+						} else {
+							error = validate({
+								playerToken: event.payload.playerToken,
+								gameToken: event.payload.gameToken,
+								card: event.payload.card,
+								expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameInProgress }
+							});
+						}
+						if (error) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+						} else {
+							if (games[event.payload.gameToken].cards.filter(c => c.name === event.payload.card).length > 0) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.card}" already in the deck`));
+							} else {
+								games[event.payload.gameToken].cards.push(deck[event.payload.card as Territories | WildCards]);
+							}
+						}
+						break;
+	
+					case 'CardsRedeemed':
+						const payload2 = (event as CardsRedeemed).payload;
+						error = validate({
+							playerToken: payload2.playerToken,
+							gameToken: payload2.gameToken,
+							cards: payload2.cards,
+							expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameInProgress }
+						});
+						if (error) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
+						} else {
+							const player = players[payload2.playerToken];
+							const game = games[payload2.gameToken];
+							const troops = rules.redeemReinforcement(game.redeemed);
+							player.reinforcement += troops;
+							game.redeemed = troops;
+							for (const card of payload2.cards) {
+								delete player.cards[card];
+								if (player.holdings.includes(card as Territories)) game.map[card as Territories].troop += 2;
 							}
 						}
 						break;

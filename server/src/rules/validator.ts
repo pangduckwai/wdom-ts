@@ -31,7 +31,7 @@ export const getValidator = (
 		games: Record<string, Game>,
 	) => {
 		return ({
-			playerToken, playerToken2, hostToken, gameToken, territory, territory2, cards, expectedStage
+			playerToken, playerToken2, hostToken, gameToken, territory, territory2, card, cards, expectedStage
 		}: {
 			playerToken?: string;
 			playerToken2?: string;
@@ -39,6 +39,7 @@ export const getValidator = (
 			gameToken?: string;
 			territory?: string;
 			territory2?: string;
+			card?: string;
 			cards?: string[];
 			expectedStage?: { expected: Expected, stage: GameStage; };
 		}) => {
@@ -51,16 +52,26 @@ export const getValidator = (
 				if (!map[territory as Territories].connected.has(territory2 as Territories))
 					return `Territories "${territory}" and "${territory2}" are not connected`;
 			}
+
+			if (card) {
+				if (!deck[card as (WildCards | Territories)]) return `Invalid card "${card}"`;
+			}
+
+			const player = playerToken ? players[playerToken] : null;
 			if (cards) {
-				for (const card of cards) {
-					if (!deck[card as (WildCards | Territories)]) return `Invalid card "${card}"`;
+				if (cards.length !== 3) return 'Need to redeem 3 cards';
+				for (const c of cards) {
+					if (!deck[c as (WildCards | Territories)]) return `Invalid card "${c}"`;
+					if (player) {
+						if (!player.cards[c]) return `Player "${player.name}" does not own the "${c}" card`;
+					}
 				}
+				if (!rules.isRedeemable(cards.map(c => deck[c as (WildCards | Territories)])))
+					return `Cards ${JSON.stringify(cards)} is not a redeemable set`;
 			}
 
 			if (gameToken) {
 				const game = games[gameToken];
-				const player = playerToken ? players[playerToken] : null;
-
 				if (!game) return `Game "${gameToken}" not found`;
 
 				if ((hostToken) && (game.host !== hostToken))

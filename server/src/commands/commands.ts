@@ -11,8 +11,8 @@ import {
 	GameOpened, GameClosed, GameJoined, GameQuitted,
 	PlayerShuffled, GameStarted, TerritoryAssigned,
 	TerritorySelected, TroopPlaced, TerritoryAttacked, TurnEnded, PositionFortified,
-	CardReturned,
-	// CardsRedeemed, PlayerDefeated, GameWon
+	CardReturned, CardsRedeemed
+	// PlayerDefeated, GameWon
 } from '.';
 
 export type Commands = {
@@ -26,6 +26,7 @@ export type Commands = {
 	MakeMove: (payload: { playerToken: string; gameToken: string; territoryName: string; flag: number }) => Promise<Commit>,
 	EndTurn: (payload: { playerToken: string; gameToken: string }) => Promise<Commit>,
 	FortifyPosition: (payload: { playerToken: string; gameToken: string; territoryName: string; amount: number }) => Promise<Commit>,
+	RedeemCards: (payload: { playerToken: string; gameToken: string; cardNames: string[] }) => Promise<Commit>,
 };
 
 // TODO: re-examine which checking shoud be in commands, which in reducer. Try to minimize checking in commands
@@ -274,6 +275,29 @@ export const getCommands = (
 				}
 			}
 		},
+		RedeemCards: async ({ playerToken, gameToken, cardNames }: { playerToken: string; gameToken: string; cardNames: string[] }) => {
+			const { players, games } = await snapshot.read();
+			const error = validator(players, games)({
+				playerToken,
+				gameToken,
+				cards: cardNames
+			});
+			if (error) {
+				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.RedeemCards] ${error}`)));
+			} else {
+				const { build, addEvent } = createCommit().addEvent<CardsRedeemed>({
+					type: 'CardsRedeemed',
+					payload: { playerToken, gameToken, cards: cardNames as (WildCards | Territories)[] }
+				});
+				for (const card of cardNames) {
+					addEvent<CardReturned>({
+						type: 'CardReturned',
+						payload: { playerToken, gameToken, card: card as (WildCards | Territories) }
+					});
+				}
+				return build(commitStore);
+			}
+		},
 		// FinishSetup: (payload: { playerToken: string; gameToken: string }) =>
 		// 	createCommit().addEvent<SetupFinished>({
 		// 		type: 'SetupFinished',
@@ -344,19 +368,6 @@ export const getCommands = (
 		// 		type: 'TurnEnded',
 		// 		payload
 		// 	}).build(commitStore),
-		// RedeemCards: (payload: { playerToken: string; gameToken: string; cardNames: string[] }) => {
-		// 	const { build, addEvent } = createCommit().addEvent<CardsRedeemed>({
-		// 		type: 'CardsRedeemed',
-		// 		payload
-		// 	});
-		// 	for (const card of payload.cardNames) {
-		// 		addEvent<CardReturned>({
-		// 			type: 'CardReturned',
-		// 			payload: { playerToken: payload.playerToken, gameToken: payload.gameToken, cardName: card }
-		// 		});
-		// 	}
-		// 	return build(commitStore);
-		// },
 		// WinGame: (payload: { playerToken: string; gameToken: string }) =>
 		// 	createCommit().addEvent<GameWon>({
 		// 		type: 'GameWon',
