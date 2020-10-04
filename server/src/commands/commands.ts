@@ -156,6 +156,9 @@ export const getCommands = (
 					const flagAll = (flag & FLAG_ALT) > 0; // place all remaining troops at once
 					const flagDdc = (flag & FLAG_SHIFT) > 0; // subtract troop
 					if (player.reinforcement > 0) {
+						if (Object.keys(player.cards).length >= rules.MaxCardsPerPlayer) {
+							return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] Please redeem cards before continuing`)));
+						}
 						const unclaimed = Object.values(game.map).filter(t => t.troop <= 0).length;
 						if ((game.round > 0) || // After setup phase
 								(game.ruleType === RuleTypes.SETUP_RANDOM) || // Setup phase (game.round == 0) using random assign initial territories rule
@@ -176,7 +179,9 @@ export const getCommands = (
 				} else {
 					// Clicking on other players territory
 					if (player.reinforcement > 0) {
-						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] turn setup not ready`)));
+						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] Please deploy all reinforcement before continuing`)));
+					} else if (Object.keys(player.cards).length >= rules.MaxCardsPerPlayer) {
+						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] Please redeem cards before continuing`)));
 					}
 
 					const notConnect = validator(players, games)({
@@ -230,6 +235,8 @@ export const getCommands = (
 			});
 			if (error) {
 				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.EndTurn] ${error}`)));
+			} else if (Object.keys(players[playerToken].cards).length >= rules.MaxCardsPerPlayer) {
+				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] Please redeem cards before continuing`)));
 			} else {
 				return createCommit().addEvent<TurnEnded>({
 					type: 'TurnEnded',
@@ -249,6 +256,8 @@ export const getCommands = (
 			});
 			if (error) {
 				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.FortifyPosition] ${error}`)));
+			} else if (Object.keys(players[playerToken].cards).length >= rules.MaxCardsPerPlayer) {
+				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] Please redeem cards before continuing`)));
 			} else {
 				const player = players[playerToken];
 				const game = games[gameToken];
