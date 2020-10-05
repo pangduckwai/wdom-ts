@@ -77,7 +77,7 @@ export const reducer = (
 					case 'PlayerRegistered':
 						if (Object.values(players).filter(player => player.name === event.payload.playerName).length > 0) {
 							messages.push(buildMessage(
-								commit.id, MessageType.Error, event.type, `Player "${event.payload.playerName}" already registered`
+								commit.id, MessageType.Error, event.type, `[${event.payload.playerName}] already registered`
 							));
 						} else {
 							players[commit.id] = {
@@ -98,7 +98,7 @@ export const reducer = (
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else {
 							if (players[event.payload.playerToken].joined) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Please quit any current game before leaving`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] please quit any current game before leaving`));
 							} else {
 								players[event.payload.playerToken].status = Status.Deleted;
 							}
@@ -115,7 +115,7 @@ export const reducer = (
 							} else {
 								const joined = players[event.payload.playerToken].joined;
 								if (joined) {
-									messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You already in the game "${games[joined].name}" and cannot open a new one`));
+									messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] already in game "${games[joined].name}" and cannot open a new one`));
 								} else {
 									games[commit.id] = {
 										token: commit.id,
@@ -158,7 +158,7 @@ export const reducer = (
 									}
 								}
 							} else {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Player "${players[event.payload.playerToken].name}" is not hosting any game`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] is not hosting any game`));
 							}
 						}
 						break;
@@ -173,9 +173,9 @@ export const reducer = (
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else {
 							if (games[event.payload.gameToken].host === event.payload.playerToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You don't need to join your own game`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] cannot join your own game`));
 							}if (players[event.payload.playerToken].joined) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You already joined game "${players[event.payload.playerToken].joined}"`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] already joined game "${players[event.payload.playerToken].joined}"`));
 							} else {
 								error = validateNumOfPlayers(players, games[event.payload.gameToken], { checkFull: true });
 								if (error) {
@@ -195,9 +195,9 @@ export const reducer = (
 						} else {
 							const joinedToken = players[event.payload.playerToken].joined;
 							if (!joinedToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You are not in any game currently`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] is not in any game currently`));
 							} else if (games[joinedToken].host === event.payload.playerToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `You cannot quit from the game you are hosting`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] cannot quit from the game you are hosting`));
 							} else {
 								players[event.payload.playerToken].joined = undefined;
 								games[joinedToken].players = games[joinedToken].players.filter(p => p !== event.payload.playerToken);
@@ -311,9 +311,9 @@ export const reducer = (
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else {
 							if (players[event.payload.playerToken].holdings.filter(t => t === event.payload.territory).length <= 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Cannot place troops on another player's territory`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] cannot place troops on another player's territory ${event.payload.territory}`));
 							} else if (players[event.payload.playerToken].reinforcement < event.payload.amount) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Insufficient reinforcement`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] insufficient reinforcement, ${players[event.payload.playerToken].reinforcement} troop(s) left`));
 							} else {
 								games[event.payload.gameToken].map[event.payload.territory as Territories].troop += event.payload.amount;
 								players[event.payload.playerToken].reinforcement -= event.payload.amount;
@@ -361,14 +361,14 @@ export const reducer = (
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else {
 							if (games[payload0.gameToken].map[payload0.fromTerritory].troop < 2) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Insufficient troops to initiate an attack`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[payload0.fromPlayer]}] insufficient troops on ${payload0.fromTerritory} to initiate an attack`));
 							} else if (
 								(payload0.attackerLoss < 0) || (payload0.defenderLoss < 0) ||
 								((payload0.attackerLoss === 0) && (payload0.defenderLoss === 0))
 							) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Invalid inputs: attacker loss ${payload0.attackerLoss} / defender loss ${payload0.defenderLoss}`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[payload0.fromPlayer]}] invalid inputs: attacker loss ${payload0.attackerLoss} / defender loss ${payload0.defenderLoss}`));
 							} else if (games[payload0.gameToken].map[payload0.fromTerritory].troop <= payload0.attackerLoss) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Attacker loss larger than attacker's troops number`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[payload0.fromPlayer]}] attacker loss larger than attacker's troops number`));
 							} else {
 								games[payload0.gameToken].lastBattle = { redDice: payload0.redDice, whiteDice: payload0.whiteDice }
 								games[payload0.gameToken].map[payload0.fromTerritory].troop -= payload0.attackerLoss;
@@ -411,9 +411,9 @@ export const reducer = (
 						if (error) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else if (players[event.payload.playerToken].reinforcement > 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `All reinforcement need to be deployed before ending a turn`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] all reinforcement need to be deployed before ending a turn`));
 						} else if (Object.keys(players[event.payload.playerToken].cards).length >= rules.MaxCardsPerPlayer) {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Please redeem cards before continuing`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] please redeem cards before continuing`));
 						} else {
 							if (turnEnded(players, games, event.payload.playerToken, event.payload.gameToken) >= 0) {
 								turnStarted(world, players, games, event.payload.gameToken);
@@ -434,18 +434,18 @@ export const reducer = (
 						});
 						if (error) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
-						} else if (players[event.payload.playerToken].reinforcement > 0) {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `All reinforcement need to be deployed before fortification`));
+						} else if (players[payload1.playerToken].reinforcement > 0) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[payload1.playerToken].name}] all reinforcement need to be deployed before fortification`));
 						} else if (Object.keys(players[event.payload.playerToken].cards).length >= rules.MaxCardsPerPlayer) {
-							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Please redeem cards before continuing`));
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[payload1.playerToken].name}] please redeem cards before continuing`));
 						} else {
 							if ((players[payload1.playerToken].holdings.filter(t => t === payload1.toTerritory).length <= 0) ||
 									(players[payload1.playerToken].holdings.filter(t => t === payload1.fromTerritory).length <= 0)) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Cannot fortify other player's position`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[payload1.playerToken].name}] cannot fortify other player's position`));
 							} else if (payload1.amount <= 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Invalid fortification amount`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[payload1.playerToken].name}] invalid fortification amount ${payload1.amount}`));
 							} else if (payload1.amount >= games[payload1.gameToken].map[payload1.fromTerritory].troop) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Insufficient troops to fortify`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[payload1.playerToken].name}] insufficient troops on ${payload1.fromTerritory} to fortify`));
 							} else {
 								games[payload1.gameToken].map[payload1.fromTerritory].troop -= payload1.amount;
 								games[payload1.gameToken].map[payload1.toTerritory].troop += payload1.amount;

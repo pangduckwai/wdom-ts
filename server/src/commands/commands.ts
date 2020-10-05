@@ -156,7 +156,7 @@ export const getCommands = (
 					const flagDdc = (flag & FLAG_SHIFT) > 0; // subtract troop
 					if (player.reinforcement > 0) {
 						if (Object.keys(player.cards).length >= rules.MaxCardsPerPlayer) {
-							return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] Please redeem cards before continuing`)));
+							return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] [${player.name}] please redeem cards before continuing`)));
 						}
 						const unclaimed = Object.values(game.map).filter(t => t.troop <= 0).length;
 						if ((game.round > 0) || // After setup phase
@@ -171,16 +171,16 @@ export const getCommands = (
 							});
 						} else {
 							if (unclaimed > 0) {
-								return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] please claim all territories first`)));
+								return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] [${player.name}] please claim all territories first`)));
 							}
 						}
 					}
 				} else {
 					// Clicking on other players territory
 					if (player.reinforcement > 0) {
-						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] Please deploy all reinforcement before continuing`)));
+						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] [${player.name}] please deploy all reinforcement before continuing`)));
 					} else if (Object.keys(player.cards).length >= rules.MaxCardsPerPlayer) {
-						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] Please redeem cards before continuing`)));
+						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] [${player.name}] please redeem cards before continuing`)));
 					}
 
 					const notConnect = validator(players, games)({
@@ -212,10 +212,10 @@ export const getCommands = (
 										}
 									});
 								} else {
-									return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] insufficient troops to initiate an attack`)));
+									return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] [${player.name}] insufficient troops to initiate an attack from ${player.selected} to ${territoryName}`)));
 								}
 							} else {
-								return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] player must select a territory to attack from`)));
+								return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] [${player.name}] please select a territory to attack from`)));
 							}
 						} else { // should not be possible to get here
 							return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] unable to find owner of ${territoryName}`)));
@@ -241,7 +241,7 @@ export const getCommands = (
 			} else {
 				const player = players[playerToken];
 				if (!player.selected) {
-					return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] player must select a territory to move troops from`)));
+					return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] [${player.name}] please select a territory to move troops from`)));
 				} else {
 					return createCommit().addEvent<PositionFortified>({
 						type: 'PositionFortified',
@@ -252,11 +252,7 @@ export const getCommands = (
 		},
 		RedeemCards: async ({ playerToken, gameToken, cardNames }: { playerToken: string; gameToken: string; cardNames: string[] }) => {
 			const { players, games } = await snapshot.read();
-			const error = validator(players, games)({
-				// playerToken,
-				// gameToken,
-				cards: cardNames
-			});
+			const error = validator(players, games)({ cards: cardNames });
 			if (error) {
 				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.RedeemCards] ${error}`)));
 			} else {

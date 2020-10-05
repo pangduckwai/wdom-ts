@@ -59,11 +59,11 @@ export const getValidator = (
 
 			const player = playerToken ? players[playerToken] : null;
 			if (cards) {
-				if (cards.length !== 3) return 'Need to redeem 3 cards';
+				if (cards.length !== 3) return `${player ? `[${player.name}] p` : 'P'}lease redeem a set of 3 cards`;
 				for (const c of cards) {
 					if (!deck[c as (WildCards | Territories)]) return `Invalid card "${c}"`;
 					if (player) {
-						if (!player.cards[c]) return `Player "${player.name}" does not own the "${c}" card`;
+						if (!player.cards[c]) return `[${player.name}] does not own the "${c}" card`;
 					}
 				}
 				if (!rules.isRedeemable(cards.map(c => deck[c as (WildCards | Territories)])))
@@ -80,21 +80,21 @@ export const getValidator = (
 					return `Game "${game.name}" already finished`;
 
 				if ((hostToken) && (game.host !== hostToken))
-					return `Player "${players[hostToken].name}" is not the host of game "${game.name}"`;
+					return `[${players[hostToken].name}] is not the host of game "${game.name}"`;
 
 				if (player) {
 					if (game.round >= 0) {
 						// Players already join games
 						if (game.players.filter(k => k === playerToken).length <= 0)
-							return `Player "${player.name}" not found in game "${game.name}"`;
+							return `["${player.name}] not found in game "${game.name}"`;
 						if (!player.joined || (player.joined !== gameToken))
-							return `Player "${player.name}" not in game "${game.name}"`;
+							return `[${player.name}] not in game "${game.name}"`;
 						if (game.players[game.turns] !== playerToken)
 							return `It is not the turn of player "${player.name}"`;
 					}
 				}
 				if (playerToken2 && (game.players.filter(k => k === playerToken2).length <= 0))
-					return `Player "${playerToken2}" not in game "${game.name}"`;
+					return `[${playerToken2}] not in game "${game.name}"`;
 
 				if (typeof expectedStage !== 'undefined') {
 					const count = game.players.filter(k => players[k].reinforcement > 0).length;

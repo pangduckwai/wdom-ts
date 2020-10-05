@@ -122,7 +122,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		await commands.RegisterPlayer({ playerName: 'josh' });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Player "josh" already registered').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[josh] already registered').length).toEqual(1);
 	});
 
 	it('non-existing player leave', async () => {
@@ -173,7 +173,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		await commands.JoinGame({ playerToken, gameToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'You don\'t need to join your own game').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[pete] cannot join your own game').length).toEqual(1);
 	});
 
 	it('player close game', async () => {
@@ -192,7 +192,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		await commands.CloseGame({ playerToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Player "matt" is not the host of game "josh\'s game"').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[matt] is not the host of game "josh\'s game"').length).toEqual(1);
 	});
 
 	it('players join another game', async () => {
@@ -233,7 +233,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		await commands.QuitGame({ playerToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'You cannot quit from the game you are hosting').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[pete] cannot quit from the game you are hosting').length).toEqual(1);
 	});
 
 	it('player not in a game try to quit game', async () => {
@@ -241,14 +241,14 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		await commands.QuitGame({ playerToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'You are not in any game currently').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[dick] is not in any game currently').length).toEqual(1);
 	});
 
 	it('non-host player try to start a game', async () => {
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'matt')[0].token;
 		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
 		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
-		await expect(commands.StartGame({ playerToken, gameToken })).rejects.toThrow('Player "matt" is not the host of game "josh\'s game"');
+		await expect(commands.StartGame({ playerToken, gameToken })).rejects.toThrow('[matt] is not the host of game "josh\'s game"');
 	});
 
 	it('player try to join a full game', async () => {
@@ -659,7 +659,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 		});
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Please redeem cards before continuing').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[john] please redeem cards before continuing').length).toEqual(1);
 	});
 
 	it('"john" (player 3) try to fortify position when having 5 cards', async () => {
@@ -669,14 +669,14 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 		});
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Please redeem cards before continuing').length).toEqual(2);
+		expect(reports.messages.filter(m => m.message === '[john] please redeem cards before continuing').length).toEqual(2);
 	});
 
 	it('"john" (player 3) try to continue his turn when having 5 cards', async () => {
 		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
 		await expect(commands.MakeMove({
 			playerToken, gameToken, territoryName: 'Quebec', flag: 2
-		})).rejects.toThrow('Please redeem cards before continuing');
+		})).rejects.toThrow('[john] please redeem cards before continuing');
 	});
 
 	it('"john" (player 3) try to redeem cards he/she doesn\'t have (still in the deck)', async () => {
@@ -686,7 +686,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 		});
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Player "john" does not own the "North-Africa" card').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[john] does not own the "North-Africa" card').length).toEqual(1);
 		expect(reports.messages.filter(m => m.message === 'Card "Egypt" is not free to return to the deck').length).toEqual(1);
 		expect(reports.messages.filter(m => m.message === 'Card "North-Africa" already in the deck').length).toEqual(1);
 		expect(reports.messages.filter(m => m.message === 'Card "Ontario" is not free to return to the deck').length).toEqual(1);
@@ -699,7 +699,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 		});
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Player "john" does not own the "Afghanistan" card').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[john] does not own the "Afghanistan" card').length).toEqual(1);
 		expect(reports.messages.filter(m => m.message === 'Card "Egypt" is not free to return to the deck').length).toEqual(2);
 		expect(reports.messages.filter(m => m.message === 'Card "Afghanistan" is not free to return to the deck').length).toEqual(1);
 		expect(reports.messages.filter(m => m.message === 'Card "Ontario" is not free to return to the deck').length).toEqual(2);
@@ -711,7 +711,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			commands.RedeemCards({
 				playerToken, gameToken, cardNames: ['Egypt', 'Ontario']
 			})
-		).rejects.toThrow('Need to redeem 3 cards');
+		).rejects.toThrow('Please redeem a set of 3 cards');
 	});
 
 	it('"john" (player 3) try to redeem cards which were not a set', async () => {
@@ -740,7 +740,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 		});
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'All reinforcement need to be deployed before ending a turn').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[john] all reinforcement need to be deployed before ending a turn').length).toEqual(1);
 	});
 
 	it('"john" (player 3) try to fortify before deploying all reinforcement', async () => {
@@ -750,7 +750,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 		});
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'All reinforcement need to be deployed before fortification').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[john] all reinforcement need to be deployed before fortification').length).toEqual(1);
 	});
 
 	it('"john" (player 3) try to attack before deploying all reinforcement', async () => {
@@ -760,7 +760,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 		});
 		await expect(commands.MakeMove({
 			playerToken, gameToken, territoryName: 'Quebec', flag: 0
-		})).rejects.toThrow('Please deploy all reinforcement before continuing');
+		})).rejects.toThrow('[john] please deploy all reinforcement before continuing');
 	});
 
 	it('"john" (player 3) set out to defeat "nick" (player 5)', async () => {
@@ -897,7 +897,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
 		await expect(commands.MakeMove({
 			playerToken, gameToken, territoryName: 'Kamchatka', flag: 2
-		})).rejects.toThrow('Please redeem cards before continuing');
+		})).rejects.toThrow('[matt] please redeem cards before continuing');
 	});
 
 	it('"matt" (player 1) redeemed cards as required', async () => {
