@@ -12,7 +12,6 @@ import {
 	PlayerShuffled, GameStarted, TerritoryAssigned,
 	TerritorySelected, TroopPlaced, TerritoryAttacked, TurnEnded, PositionFortified,
 	CardReturned, CardsRedeemed
-	// PlayerDefeated, GameWon
 } from '.';
 
 export type Commands = {
@@ -227,68 +226,35 @@ export const getCommands = (
 			}
 		},
 		EndTurn: async ({ playerToken, gameToken }: { playerToken: string; gameToken: string }) => {
-			const { players, games } = await snapshot.read();
-			const error = validator(players, games)({
-				playerToken,
-				gameToken,
-				expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameInProgress }
-			});
-			if (error) {
-				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.EndTurn] ${error}`)));
-			} else if (Object.keys(players[playerToken].cards).length >= rules.MaxCardsPerPlayer) {
-				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] Please redeem cards before continuing`)));
-			} else {
-				return createCommit().addEvent<TurnEnded>({
-					type: 'TurnEnded',
-					payload: { playerToken, gameToken }
-				}).build(commitStore);
-			}
+			return createCommit().addEvent<TurnEnded>({
+				type: 'TurnEnded',
+				payload: { playerToken, gameToken }
+			}).build(commitStore);
 		},
 		FortifyPosition: async ({ playerToken, gameToken, territoryName, amount }: {
 			playerToken: string; gameToken: string; territoryName: string; amount: number
 		}) => {
 			const { players, games } = await snapshot.read();
-			const error = validator(players, games)({
-				playerToken,
-				gameToken,
-				territory: territoryName,
-				expectedStage: { expected: Expected.OnOrAfter, stage: GameStage.GameInProgress }
-			});
+			const error = validator(players, games)({ playerToken });
 			if (error) {
 				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.FortifyPosition] ${error}`)));
-			} else if (Object.keys(players[playerToken].cards).length >= rules.MaxCardsPerPlayer) {
-				return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] Please redeem cards before continuing`)));
 			} else {
 				const player = players[playerToken];
-				const game = games[gameToken];
-				if (player.selected) {
-					if ((player.holdings.filter(t => t === territoryName).length > 0) &&
-							(player.holdings.filter(t => t === player.selected).length > 0)) {
-						const notConnect = validator(players, games)({
-							territory: player.selected,
-							territory2: territoryName
-						});
-						if (notConnect) {
-							return new Promise<Commit>((_, reject) => reject(new Error(`[commands.FortifyPosition] ${notConnect}`)));
-						} else {
-							return createCommit().addEvent<PositionFortified>({
-								type: 'PositionFortified',
-								payload: { playerToken, gameToken, fromTerritory: player.selected, toTerritory: territoryName as Territories, amount }
-							}).build(commitStore);
-						}
-					} else {
-						return new Promise<Commit>((_, reject) => reject(new Error(`[commands.FortifyPosition] cannot fortify other player's position`)));
-					}
-				} else {
+				if (!player.selected) {
 					return new Promise<Commit>((_, reject) => reject(new Error(`[commands.MakeMove] player must select a territory to move troops from`)));
+				} else {
+					return createCommit().addEvent<PositionFortified>({
+						type: 'PositionFortified',
+						payload: { playerToken, gameToken, fromTerritory: player.selected, toTerritory: territoryName as Territories, amount }
+					}).build(commitStore);
 				}
 			}
 		},
 		RedeemCards: async ({ playerToken, gameToken, cardNames }: { playerToken: string; gameToken: string; cardNames: string[] }) => {
 			const { players, games } = await snapshot.read();
 			const error = validator(players, games)({
-				playerToken,
-				gameToken,
+				// playerToken,
+				// gameToken,
 				cards: cardNames
 			});
 			if (error) {

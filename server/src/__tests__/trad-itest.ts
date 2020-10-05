@@ -654,16 +654,22 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 
 	it('"john" (player 3) try to end turn when having 5 cards', async () => {
 		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
-		await expect(commands.EndTurn({
+		await commands.EndTurn({
 			playerToken, gameToken
-		})).rejects.toThrow('Please redeem cards before continuing');
+		});
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.messages.filter(m => m.message === 'Please redeem cards before continuing').length).toEqual(1);
 	});
 
 	it('"john" (player 3) try to fortify position when having 5 cards', async () => {
 		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
-		await expect(commands.FortifyPosition({
-			playerToken, gameToken, territoryName: 'Northwest-Territory', amount: 6
-		})).rejects.toThrow('Please redeem cards before continuing');
+		await commands.FortifyPosition({
+			playerToken, gameToken, territoryName: 'North-Africa', amount: 1
+		});
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.messages.filter(m => m.message === 'Please redeem cards before continuing').length).toEqual(2);
 	});
 
 	it('"john" (player 3) try to continue his turn when having 5 cards', async () => {
@@ -673,25 +679,33 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 		})).rejects.toThrow('Please redeem cards before continuing');
 	});
 
-	it('"john" (player 3) try to redeem cards he/she doesn\'t have', async () => {
+	it('"john" (player 3) try to redeem cards he/she doesn\'t have (still in the deck)', async () => {
 		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
-		await expect(
-			commands.RedeemCards({
-				playerToken, gameToken, cardNames: ['Egypt', 'Iceland', 'Ontario']
-			})
-		).rejects.toThrow('Player "john" does not own the "Iceland" card');
+		await commands.RedeemCards({
+			playerToken, gameToken, cardNames: ['Egypt', 'North-Africa', 'Ontario']
+		});
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.messages.filter(m => m.message === 'Player "john" does not own the "North-Africa" card').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === 'Card "Egypt" is not free to return to the deck').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === 'Card "North-Africa" already in the deck').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === 'Card "Ontario" is not free to return to the deck').length).toEqual(1);
 	});
 
 	it('"john" (player 3) try to redeem cards he/she doesn\'t have', async () => {
 		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
-		await expect(
-			commands.RedeemCards({
-				playerToken, gameToken, cardNames: ['Scandinavia', 'Egypt', 'Ontario']
-			})
-		).rejects.toThrow('Player "john" does not own the "Scandinavia" card');
+		await commands.RedeemCards({
+			playerToken, gameToken, cardNames: ['Afghanistan', 'Egypt', 'Ontario']
+		});
+		const { players, games } = await snapshot.read();
+		reports = { players, games, messages: await subscriptions.report(channel) };
+		expect(reports.messages.filter(m => m.message === 'Player "john" does not own the "Afghanistan" card').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === 'Card "Egypt" is not free to return to the deck').length).toEqual(2);
+		expect(reports.messages.filter(m => m.message === 'Card "Afghanistan" is not free to return to the deck').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === 'Card "Ontario" is not free to return to the deck').length).toEqual(2);
 	});
 
-	it('"john" (player 3) try to redeem 2 cards', async () => {
+	it('"john" (player 3) try to redeem 2 cards only', async () => {
 		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
 		await expect(
 			commands.RedeemCards({

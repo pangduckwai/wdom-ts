@@ -412,6 +412,8 @@ export const reducer = (
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else if (players[event.payload.playerToken].reinforcement > 0) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `All reinforcement need to be deployed before ending a turn`));
+						} else if (Object.keys(players[event.payload.playerToken].cards).length >= rules.MaxCardsPerPlayer) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Please redeem cards before continuing`));
 						} else {
 							if (turnEnded(players, games, event.payload.playerToken, event.payload.gameToken) >= 0) {
 								turnStarted(world, players, games, event.payload.gameToken);
@@ -434,6 +436,8 @@ export const reducer = (
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else if (players[event.payload.playerToken].reinforcement > 0) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `All reinforcement need to be deployed before fortification`));
+						} else if (Object.keys(players[event.payload.playerToken].cards).length >= rules.MaxCardsPerPlayer) {
+							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Please redeem cards before continuing`));
 						} else {
 							if ((players[payload1.playerToken].holdings.filter(t => t === payload1.toTerritory).length <= 0) ||
 									(players[payload1.playerToken].holdings.filter(t => t === payload1.fromTerritory).length <= 0)) {
@@ -474,10 +478,14 @@ export const reducer = (
 						if (error) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else {
-							if (games[event.payload.gameToken].cards.filter(c => c.name === event.payload.card).length > 0) {
+							const game = games[event.payload.gameToken];
+							if (game.cards.filter(c => c.name === event.payload.card).length > 0) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.card}" already in the deck`));
+							} else if (game.players.filter(p => Object.keys(players[p].cards).includes(event.payload.card)).length > 0) {
+								// Someone still holding the card
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.card}" is not free to return to the deck`));
 							} else {
-								games[event.payload.gameToken].cards.push(deck[event.payload.card as Territories | WildCards]);
+								game.cards.push(deck[event.payload.card as Territories | WildCards]);
 							}
 						}
 						break;
