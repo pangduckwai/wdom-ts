@@ -41,7 +41,7 @@ const turnEnded = (
 			wrapped = true;
 		}
 	} while (
-		(players[games[gameToken].players[games[gameToken].turns]].status === Status.Invalid) && // 'Invalid' means defeated for players
+		(players[games[gameToken].players[games[gameToken].turns]].status === Status.Defeated) &&
 		(games[gameToken].turns !== curr) // Extra checking to avoid infinite loop, when turn go back to the curr player, his/her status should still be valid
 	);
 	if (games[gameToken].turns === curr) {
@@ -50,7 +50,7 @@ const turnEnded = (
 		games[gameToken].round ++
 		return 1; // Next round
 	} else {
-		return 0;
+		return 0; // Next player
 	}
 };
 
@@ -385,12 +385,17 @@ export const reducer = (
 
 									if (players[payload0.toPlayer].holdings.length <= 0) {
 										// Player defeated!!!
-										players[payload0.toPlayer].status = Status.Invalid;
+										players[payload0.toPlayer].status = Status.Defeated;
 										players[payload0.fromPlayer].cards = {
 											...players[payload0.fromPlayer].cards,
 											...players[payload0.toPlayer].cards
 										};
 										players[payload0.toPlayer].cards = {};
+
+										if (games[payload0.gameToken].players.filter(p => players[p].status !== Status.Defeated).length === 1) {
+											// Player won the game!!!!
+											games[payload0.gameToken].status = Status.Finished;
+										}
 									}
 								}
 							}
@@ -408,8 +413,11 @@ export const reducer = (
 						} else if (players[event.payload.playerToken].reinforcement > 0) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, `All reinforcement need to be deployed before ending a turn`));
 						} else {
-							turnEnded(players, games, event.payload.playerToken, event.payload.gameToken);
-							turnStarted(world, players, games, event.payload.gameToken); // TODO: need to check end-game condition?
+							if (turnEnded(players, games, event.payload.playerToken, event.payload.gameToken) >= 0) {
+								turnStarted(world, players, games, event.payload.gameToken);
+							} else { // should not reach the following
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${event.payload.gameToken} already finished`));
+							}
 						}
 						break;
 
@@ -438,8 +446,11 @@ export const reducer = (
 								games[payload1.gameToken].map[payload1.fromTerritory].troop -= payload1.amount;
 								games[payload1.gameToken].map[payload1.toTerritory].troop += payload1.amount;
 								players[payload1.playerToken].selected = payload1.toTerritory;
-								turnEnded(players, games, payload1.playerToken, payload1.gameToken);
-								turnStarted(world, players, games, payload1.gameToken); // TODO: need to check end-game condition?
+								if (turnEnded(players, games, payload1.playerToken, payload1.gameToken) >= 0) {
+									turnStarted(world, players, games, payload1.gameToken);
+								} else { // should not reach the following
+									messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game ${payload1.gameToken} already finished`));
+								}
 							}
 						}
 						break;

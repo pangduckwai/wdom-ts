@@ -1,6 +1,5 @@
 import crypto from 'crypto';
-import { Card, Continent, Continents, Territory } from '.';
-import { Territories } from './territory';
+import { Card, Continent, Continents, Territories } from '.';
 
 const MAX = 16777216; // Which is 0xffffff -> 3 bytes
 
@@ -22,13 +21,13 @@ export const rules = {
 	initialTroops: (players: number): number => {
 		switch(players) {
 			case 3:
-				return 19; // real 35;
+				return 35;
 			case 4:
-				return 15; // real 30;
+				return 30;
 			case 5:
-				return 13; // real 25;
+				return 25;
 			case 6:
-				return 12; // real 20;
+				return 20;
 			default:
 				return -1;
 		}

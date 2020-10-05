@@ -74,6 +74,11 @@ export const getValidator = (
 				const game = games[gameToken];
 				if (!game) return `Game "${gameToken}" not found`;
 
+				if (game.status === Status.Deleted)
+					return `Game "${game.name}" already closed`;
+				else if (game.status === Status.Finished)
+					return `Game "${game.name}" already finished`;
+
 				if ((hostToken) && (game.host !== hostToken))
 					return `Player "${players[hostToken].name}" is not the host of game "${game.name}"`;
 
@@ -146,13 +151,11 @@ export const getValidator = (
 };
 
 export const validateNumOfPlayers = (players: Record<string, Player>, game: Game, option: {checkLack?: boolean, checkFull?: boolean}) => {
-	const playerCnt = game.players.filter(p => players[p].status !== Status.Invalid).length;
+	const playerCnt = game.players.filter(p => players[p].status !== Status.Defeated).length;
 	if ((playerCnt < rules.MinPlayerPerGame) && option.checkLack) {
 		return `Not enough players in the game "${game.name}" yet`;
 	} else if ((playerCnt >= rules.MaxPlayerPerGame) && option.checkFull) {
 		return `Game "${game.name}" already full`;
-	// } else if (playerCnt > rules.MaxPlayerPerGame) {
-	// 	return `Too many players in the game "${game.name}" already`;
 	} else {
 		return undefined;
 	}

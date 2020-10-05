@@ -24,5 +24,5 @@ export const FLAG_ALT = 2;   // 0010
 export const FLAG_CTRL = 4;  // 0100
 
 export enum Status {
-  Deleted, New, Ready, Invalid
+  Deleted, New, Ready, Defeated, Finished
 };

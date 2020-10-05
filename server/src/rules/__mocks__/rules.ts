@@ -38,7 +38,7 @@ export const rules = {
 			case 6:
 				return 8;
 			case 8:
-				return 10;
+				return 15;
 			default:
 				if (last >= 10) {
 					if (last < 65) {
