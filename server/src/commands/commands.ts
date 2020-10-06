@@ -4,7 +4,7 @@ import {
 	_shuffle, rules, Card, Territories, Territory, WildCards, GameStage, Expected, RuleTypes,
 	getValidator, validateNumOfPlayers
 } from '../rules';
-import { FLAG_SHIFT, FLAG_ALT, Status } from '..';
+import { FLAG_SHIFT, FLAG_ALT, generateToken } from '..';
 import {
 	Commit, CommitStore, createCommit, getCommitStore,
 	PlayerRegistered, PlayerLeft,
@@ -28,11 +28,9 @@ export type Commands = {
 	RedeemCards: (payload: { playerToken: string; gameToken: string; cardNames: string[] }) => Promise<Commit>,
 };
 
-// TODO: re-examine which checking shoud be in commands, which in reducer. Try to minimize checking in commands
 export const getCommands = (
 	channel: string,
 	client: Redis,
-	// world: Record<Continents, Continent>,
 	map: Record<Territories, Territory>,
 	deck: Record<WildCards | Territories, Card>
 ): Commands => {
@@ -44,7 +42,10 @@ export const getCommands = (
 		RegisterPlayer: (payload: { playerName: string }) =>
 			createCommit().addEvent<PlayerRegistered>({
 				type: 'PlayerRegistered',
-				payload
+				payload: {
+					playerName: payload.playerName,
+					sessionId: generateToken()
+				}
 			}).build(commitStore),
 		PlayerLeave: (payload: { playerToken: string }) =>
 			createCommit().addEvent<PlayerLeft>({

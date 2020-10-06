@@ -11,6 +11,7 @@ export interface PlayerRegistered extends BaseEvent {
 	readonly type: 'PlayerRegistered';
 	payload: {
 		playerName: string;
+		sessionId: string;
 	}
 }
 

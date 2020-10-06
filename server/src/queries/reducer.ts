@@ -1,5 +1,5 @@
 import { Commit, PositionFortified, TerritoryAttacked, CardsRedeemed } from '../commands';
-import { generateToken, Status } from '..';
+import { Status } from '..';
 import {
 	buildMap, buildWorld,
 	Card, Game, Player, rules, _shuffle, Territories, WildCards, Territory,
@@ -87,7 +87,7 @@ export const reducer = (
 								status: Status.New,
 								holdings: [],
 								cards: {},
-								sessionid: generateToken()
+								sessionid: event.payload.sessionId
 							};
 						}
 						break;

@@ -1,4 +1,5 @@
 import { Redis } from 'ioredis';
+import { Commands } from '.';
 
 export * from './events';
 export * from './commands';
@@ -11,6 +12,7 @@ export const BusyTimeout = 900;
 export type CommandContext = {
 	client: Redis;
 	channel: string;
+	commands: Commands;
 	sessionid?: string;
 };
 

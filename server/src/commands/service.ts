@@ -1,6 +1,7 @@
 import { ApolloServer, ServerInfo } from 'apollo-server';
 import RedisClient, { Redis } from 'ioredis';
-import { CommandContext, schema } from '.';
+import { buildDeck, buildMap } from '../rules';
+import { CommandContext, schema, getCommands } from '.';
 
 // =================================
 // === Starting Commands Service ===
@@ -43,10 +44,11 @@ export const commandService: (args: {
 		console.log('Redis client connected');
 	});
 
+	const commands = getCommands(channel, client, buildMap(), buildDeck());
 	const service = new ApolloServer({
 		context: async ({ req }) => {
 			const context: CommandContext = {
-				channel, client
+				channel, client, commands
 			};
 			const auth = (req.headers && req.headers.authorization) ? req.headers.authorization : null;
 			if (auth) {

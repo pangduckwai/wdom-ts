@@ -14,7 +14,7 @@
 		"trad-cmd-test": "jest trad-cmd-test",
 		"sim": "jest simulation",
 		"start": "nodemon dist/server.js",
-		"commands": "nodemon dist/service-commands.js"
+		"commands": "nodemon dist/service-cmds.js"
 	},
 	"repository": "https://github.com/pangduckwai/wdom-ts.git",
 	"author": "paul.lai@sea9.org",

@@ -18,8 +18,11 @@ type Mutation {
 	quitGame(playerToken: String!): Response!
 	startGame(playerToken: String!, gameToken: String!): Response!
 	makeMove(
-		
-	)
+		playerToken: String!
+		gameToken: String!
+		territoryName: String!
+		flag: Int!
+	): Response!
 	fortify(
 		playerToken: String!
 		gameToken: String!
@@ -53,9 +56,7 @@ export const resolvers = {
 		__resolveType: (obj: any) => (obj.id) ? 'Commit' : (obj.message) ? 'Error' : {}
 	},
 	Query: {
-		getCommitById: async (
-			_: any, { id }: any, { client, channel }: CommandContext
-    ): Promise<Commit | ApolloError> =>
+		getCommitById: async (_: any, { id }: any, { client, channel }: CommandContext): Promise<Commit | ApolloError> =>
       getCommitStore(channel, client).get({ id })
 				.then(result => (result.length > 0) ? result[0] : new ApolloError('Invalid result from CommitStore.get()'))
 				.catch(error => new ApolloError(error)),
@@ -72,10 +73,10 @@ export const resolvers = {
 		},
 	},
 	Mutation: {
-    // registerPlayer: async (_: any, { playerName }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-    //   getCommands(channel, client).RegisterPlayer({ playerName })
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
+    registerPlayer: async (_: any, { playerName }: any, { commands }: CommandContext): Promise<Commit | ApolloError> =>
+			commands.RegisterPlayer({ playerName })
+				.then(result => result)
+				.catch(error => new ApolloError(error)),
 		// leaveGameRoom: async (_: any, { playerToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
 		// 	CommitStore(client).put(channel, Commands.PlayerLeave({ playerToken }))
 		// 		.then(result => result)
