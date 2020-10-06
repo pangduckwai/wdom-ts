@@ -16,14 +16,6 @@ const topic = `${CHANNEL}progtest`;
 
 let publisher: Redis;
 
-// // 	beforeAll(async () => {
-// // 		publisher0 = new RedisClient({ host, port });
-// // 		await new Promise((resolve) => setTimeout(() => resolve(), 100));
-// // 	});
-
-// // 	afterAll(async () => {
-// // 		await publisher0.quit();
-// // 	});
 beforeAll(async () => {
 	publisher = new RedisClient({ host, port });
 	await new Promise((resolve) => setTimeout(() => resolve(), 100));

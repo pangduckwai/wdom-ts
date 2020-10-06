@@ -12,41 +12,22 @@ type Query {
 type Mutation {
 	registerPlayer(playerName: String!): Response!
 	leaveGameRoom(playerToken: String!): Response!
-	openGame(playerToken: String!, gameName: String!): Response!
+	openGame(playerToken: String!, gameName: String!, ruleType: String!): Response!
 	closeGame(playerToken: String!): Response!
 	joinGame(playerToken: String!, gameToken: String!): Response!
 	quitGame(playerToken: String!): Response!
 	startGame(playerToken: String!, gameToken: String!): Response!
-	selectTerritory(playerToken: String!, gameToken: String!, territoryName: String!): Response!
-	attackTerritory(
-		playerToken: String!
-		gameToken: String!
-		fromTerritory: String!
-		toTerritory: String!
-		attackerLoss: Int!
-		defenderLoss: Int!
-	): Response!
-	conquerTerritory(
-		fromPlayer: String!
-		toPlayer: String!
-		gameToken: String!
-		fromTerritory: String!
-		toTerritory: String!
-	): Response!
+	makeMove(
+		
+	)
 	fortify(
 		playerToken: String!
 		gameToken: String!
-		fromTerritory: String!
-		toTerritory: String!
+		territoryName: String!
 		amount: Int!
 	): Response!
-	defeatPlayer(fromPlayer: String!, toPlayer: String!, gameToken: String!): Response!
-	placeTroop(playerToken: String!, gameToken: String!, territoryName: String!, amount: Int): Response!
-	nextPlayer(fromPlayer: String!, toPlayer: String!, gameToken: String!): Response!
-	finishSetup(playerToken: String!, gameToken: String!): Response!
 	endTurn(playerToken: String!, gameToken: String!): Response!
 	redeemCards(playerToken: String!, gameToken: String!, cardNames: [String!]!): Response!
-	winGame(playerToken: String!, gameToken: String!): Response!
 }
 
 type Event {

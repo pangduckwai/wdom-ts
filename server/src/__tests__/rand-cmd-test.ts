@@ -3,13 +3,12 @@ jest.mock('../rules/card');
 jest.mock('../rules/rules');
 jest.mock('../commands/index');
 import RedisClient, { Redis } from 'ioredis';
-// import { fromEventPattern, Observable, Subscription } from 'rxjs';
-// import { debounceTime, filter } from 'rxjs/operators';
-import { BusyTimeout, Commands, Commit, getCommands, getCommitStore, toCommits } from '../commands';
+import { BusyTimeout, Commands, getCommands } from '../commands';
 import { getSnapshot, getSubscriptions, Message, Snapshot, Subscriptions } from '../queries';
-import { buildDeck, buildMap, buildWorld, Card, Game, Player, rules, _shuffle, shuffle, Territories, WildCards, RuleTypes } from '../rules';
-import { CHANNEL, deserialize, isEmpty } from '..';
+import { buildDeck, buildMap, buildWorld, Game, Player, rules, _shuffle, Territories, RuleTypes } from '../rules';
+import { CHANNEL } from '..';
 
+const statusName = ['Deleted ', 'New     ', 'Ready   ', 'Defeated', 'Finished'];
 const output = (
 	reports: {
 		players: Record<string, Player>;
@@ -18,34 +17,31 @@ const output = (
 	},
 	hostName: string
 ) => {
-		const x = Object.values(reports.players).filter(p => p.name === hostName)[0].token;
-		const y = Object.values(reports.games).filter(g => g.host === x)[0].token;
-		const g = reports.games[y];
-		const output = 
-	`>>> "${g.name}" [status: ${g.status}] [round: ${g.round}] [turn: ${g.turns}] [redeemed: ${g.redeemed}] ${(g.lastBattle ? `[red: ${g.lastBattle.redDice}; white: ${g.lastBattle.whiteDice}]` : '')}
-  Card deck: ${g.cards.map(c => c.name)}
-  Members:${g.players.map(k => {
-		const p = reports.players[k];
-		return `\n  ${k === x ? '*' : '-' } "${p.name}" [status: ${p.status}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"] [selected: ${reports.players[k].selected}]
-	....holdings:${p.holdings.map(t => ` ${g.map[t].name}[${g.map[t].troop}]`)}
-	....cards   :${Object.values(p.cards).map(c => ` ${c.name}(${c.type})`)}`;
+	const x = Object.values(reports.players).filter(p => p.name === hostName)[0].token;
+	const y = Object.values(reports.games).filter(g => g.host === x)[0].token;
+	const g = reports.games[y];
+	const output = 
+`>>> "${g.name}" [status: ${statusName[g.status].trim()}] [round: ${g.round}] [turn: ${g.turns}] [redeemed: ${g.redeemed}] ${(g.lastBattle ? `[red: ${g.lastBattle.redDice}; white: ${g.lastBattle.whiteDice}]` : '')}
+Card deck: ${g.cards.map(c => ` ${c.name}(${['W','A','C','I'][c.type]})`)}
+Members:${g.players.map(k => {
+	const p = reports.players[k];
+	return `\n  ${k === x ? '*' : '-' } "${p.name}" [status: ${statusName[p.status].trim()}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"] [selected: ${reports.players[k].selected}]
+....holdings:${p.holdings.map(t => ` ${g.map[t].name}[${g.map[t].troop}]`)}
+....cards   :${Object.values(p.cards).map(c => ` ${c.name}(${['W','A','C','I'][c.type]})`)}`;
+})}`;
+	console.log(output.replace(/[.][.][.][.]/gi, '    '));
+
+	const room = `Game room:${Object.values(reports.players).map(p => {
+		return `\n "${p.name}" [token: ${p.token}] [status: ${statusName[p.status]}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"]`;
 	})}`;
-		console.log(output.replace(/[.][.][.][.]/gi, '  '));
+	console.log(room);
 
-		const room = `Game room:${Object.values(reports.players).map(p => {
-			return `\n "${p.name}" [token: ${p.token}] [status: ${p.status}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"]`;
-		})}`;
-		console.log(room);
-
-		let message = '';
-		// for (let i = ((reports.messages.length - 5) > 0 ? reports.messages.length - 5 : 0); i < reports.messages.length; i ++) {
-		// 	message += `${reports.messages[i].commitId} ${reports.messages[i].type} ${reports.messages[i].eventName} ${reports.messages[i].message}\n`;
-		// }
-		for (let i = 0; i < reports.messages.length; i ++) {
-			message += `${reports.messages[i].commitId} ${reports.messages[i].type} ${reports.messages[i].eventName} ${reports.messages[i].message}\n`;
-		}
-		if (reports.messages.length > 0) console.log(message);
-	};
+	let message = '';
+	for (let i = 0; i < reports.messages.length; i ++) {
+		message += `${reports.messages[i].commitId} ${reports.messages[i].type} ${reports.messages[i].eventName} ${reports.messages[i].message}\n`;
+	}
+	if (reports.messages.length > 0) console.log(message);
+};
 	
 const host = process.env.REDIS_HOST;
 const port = (process.env.REDIS_PORT || 6379) as number;
@@ -133,7 +129,7 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		await commands.RegisterPlayer({ playerName: 'josh' });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Player "josh" already registered').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[josh] already registered').length).toEqual(1);
 	});
 
 	it('non-existing player leave', async () => {
@@ -184,7 +180,7 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		await commands.JoinGame({ playerToken, gameToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'You don\'t need to join your own game').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[pete] cannot join your own game').length).toEqual(1);
 	});
 
 	it('player close game', async () => {
@@ -203,7 +199,7 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		await commands.CloseGame({ playerToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'Player "matt" is not the host of game "josh\'s game"').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[matt] is not the host of game "josh\'s game"').length).toEqual(1);
 	});
 
 	it('players join another game', async () => {
@@ -244,7 +240,7 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		await commands.QuitGame({ playerToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'You cannot quit from the game you are hosting').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[pete] cannot quit from the game you are hosting').length).toEqual(1);
 	});
 
 	it('player not in a game try to quit game', async () => {
@@ -252,17 +248,14 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		await commands.QuitGame({ playerToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
-		expect(reports.messages.filter(m => m.message === 'You are not in any game currently').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[dick] is not in any game currently').length).toEqual(1);
 	});
 
 	it('non-host player try to start a game', async () => {
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'matt')[0].token;
 		const hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
 		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
-		await expect(commands.StartGame({ playerToken, gameToken })).rejects.toThrow('Player "matt" is not the host of game "josh\'s game"');
-		// const { players, games } = await snapshot.read();
-		// reports = { players, games, messages: await subscriptions.report(channel) };
-		// expect(reports.messages.filter(m => m.message === 'Player "matt" is not the host of game "josh\'s game"').length).toEqual(89);
+		await expect(commands.StartGame({ playerToken, gameToken })).rejects.toThrow('[matt] is not the host of game "josh\'s game"');
 	});
 
 	it('player try to join a full game', async () => {
@@ -405,7 +398,7 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		const playerToken = reports.games[gameToken].players[reports.games[gameToken].turns];
 		await expect(commands.MakeMove({
 			playerToken, gameToken, territoryName: 'Siam', flag: 0
-		})).rejects.toThrow('[commands.MakeMove] turn setup not ready');
+		})).rejects.toThrow('[commands.MakeMove] [josh] please deploy all reinforcement before continuing');
 	});
 
 	it('second player play out his turn', async () => {
@@ -444,7 +437,7 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
 		expect(reports.players[playerToken].selected).toEqual('Venezuela');
-		expect(reports.games[gameToken].map['Venezuela'].troop).toEqual(3);
+		expect(reports.games[gameToken].map['Venezuela'].troop).toEqual(4);
 		expect(reports.players[reports.games[gameToken].players[reports.games[gameToken].turns]].reinforcement).toEqual(3);
 	});
 

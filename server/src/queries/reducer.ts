@@ -280,6 +280,7 @@ export const reducer = (
 
 								const playerLen = games[event.payload.gameToken].players.length; // ReinforcementArrived
 								for (const p of games[event.payload.gameToken].players) {
+									players[p].status = Status.Ready;
 									players[p].reinforcement = rules.initialTroops(playerLen) - players[p].holdings.length;
 								}
 							}
@@ -478,14 +479,20 @@ export const reducer = (
 						if (error) {
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else {
-							const game = games[event.payload.gameToken];
-							if (game.cards.filter(c => c.name === event.payload.card).length > 0) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.card}" already in the deck`));
-							} else if (game.players.filter(p => Object.keys(players[p].cards).includes(event.payload.card)).length > 0) {
-								// Someone still holding the card
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.card}" is not free to return to the deck`));
+							if (games[event.payload.gameToken].round < 0) // from StartGame
+								error = validateNumOfPlayers(players, games[event.payload.gameToken], { checkLack: true });
+							if (error) {
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 							} else {
-								game.cards.push(deck[event.payload.card as Territories | WildCards]);
+								const game = games[event.payload.gameToken];
+								if (game.cards.filter(c => c.name === event.payload.card).length > 0) {
+									messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.card}" already in the deck`));
+								} else if (game.players.filter(p => Object.keys(players[p].cards).includes(event.payload.card)).length > 0) {
+									// Someone still holding the card
+									messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Card "${event.payload.card}" is not free to return to the deck`));
+								} else {
+									game.cards.push(deck[event.payload.card as Territories | WildCards]);
+								}
 							}
 						}
 						break;
