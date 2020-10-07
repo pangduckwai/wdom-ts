@@ -2,10 +2,11 @@ require('dotenv').config();
 jest.mock('../rules/card');
 import crypto from 'crypto';
 import RedisClient, { Redis } from 'ioredis';
-import { CHANNEL, isEmpty, Status } from '..';
+import { isEmpty, Status } from '..';
 import { getCommitStore, CommitStore, createCommit, TerritorySelected } from '../commands';
 import { buildWorld, buildDeck, buildMap, Card, Continents, Game, Player, _shuffle, shuffle, Territories, WildCards } from '../rules';
 
+const CHANNEL = `wdom${Date.now}`;
 const host = process.env.REDIS_HOST;
 const port = (process.env.REDIS_PORT || 6379) as number;
 const map = buildMap();

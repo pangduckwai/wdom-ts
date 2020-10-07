@@ -110,3 +110,62 @@ mutation AssignTerritory($playerToken: String!, $gameToken: String!, $territoryN
 		}
   }
 }`;
+
+/*
+mutation {
+  registerPlayer(playerName: "josh") {
+    ... on Commit {
+      id
+      version
+      session
+      timestamp
+      events {
+        type
+      }
+    }
+    ... on Error {
+      message
+    }
+  }
+}
+
+mutation {
+  leaveGameRoom {
+    ... on Commit {
+      id
+      version
+      session
+      timestamp
+      events {
+        type
+      }
+    }
+    ... on Error {
+      message
+    }
+  }
+}
+{
+  "authorization": "iCzKyzlDXwlMTgctwIHer8qHtYlFUnCVjigSiH/8Dmg="
+}
+
+query {
+  me {
+    token
+    name
+    status
+    reinforcement
+    selected
+    joined
+    cards
+    holdings {
+      name
+      troop
+    }
+    sessionid
+  }
+}
+{
+  "authorization": "iCzKyzlDXwlMTgctwIHer8qHtYlFUnCVjigSiH/8Dmg="
+}
+*/

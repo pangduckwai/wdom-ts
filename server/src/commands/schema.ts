@@ -11,7 +11,7 @@ type Query {
 
 type Mutation {
 	registerPlayer(playerName: String!): Response!
-	leaveGameRoom(): Response!
+	leaveGameRoom: Response!
 	openGame(playerToken: String!, gameName: String!, ruleType: String!): Response!
 	closeGame(playerToken: String!): Response!
 	joinGame(playerToken: String!, gameToken: String!): Response!

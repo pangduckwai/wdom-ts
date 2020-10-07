@@ -5,8 +5,8 @@ import RedisClient, { Redis } from 'ioredis';
 import { Commands, getCommands } from '../commands';
 import { getSnapshot, getSubscriptions, Message, Snapshot, Subscriptions } from '../queries';
 import { buildDeck, buildMap, buildWorld, Game, Player, rules, _shuffle, Territories, RuleTypes } from '../rules';
-import { CHANNEL } from '..';
 
+const CHANNEL = `wdom${Date.now}`;
 const statusName = ['Deleted ', 'New     ', 'Ready   ', 'Defeated', 'Finished'];
 const output = (
 	reports: {

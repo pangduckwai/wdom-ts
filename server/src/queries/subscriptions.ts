@@ -111,17 +111,29 @@ export const getSubscriptions = (
 			});
 		},
 		stop: async (channel: string) => {
-			subscribers[channel].subscribe$?.unsubscribe();
+			return new Promise<void>(async (resolve, reject) => {
+				subscribers[channel].subscribe$?.unsubscribe();
+				subscribers[channel].ready = false;
 
-			await subscribers[channel].subscriber.unsubscribe(channel)
-				.catch(error => console.log(`Error unsubscribing from redis: ${error}`));
+				let err = '';
+				try {
+					await subscribers[channel].subscriber.unsubscribe(channel);
+				} catch (error) {
+					err = `Error unsubscribing from redis: ${error}`;
+				}
 
-			subscribers[channel].ready = false;
+				try {
+					await subscribers[channel].subscriber.quit();
+				} catch (error) {
+					err += `${(err) ? '\n' : ''}Error closing redis subscription client: ${error}`;
+				}
 
-			await subscribers[channel].subscriber.quit()
-				.catch(error => console.log(`Error closing redis subscription client: ${error}`));
-
-			delete subscribers[channel];
+				delete subscribers[channel];
+				if (err)
+					reject(err);
+				else
+					resolve();
+			});
 		},
 		report: async (channel: string) => {
 			return new Promise<Message[]>(async (resolve, reject) => {

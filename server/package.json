@@ -12,9 +12,9 @@
 		"cmd-test": "jest cmd-test",
 		"rand-cmd-test": "jest rand-cmd-test",
 		"trad-cmd-test": "jest trad-cmd-test",
-		"sim": "jest simulation",
-		"start": "nodemon dist/server.js",
-		"commands": "nodemon dist/service-cmds.js"
+		"command": "node dist/service-cmds.js %TS%",
+		"queries": "node dist/service-qrys.js %TS%",
+		"start": "npm run build && set TS=%DATE%@%TIME: =0% && concurrently \"npm:command\" \"npm:queries\""
 	},
 	"repository": "https://github.com/pangduckwai/wdom-ts.git",
 	"author": "paul.lai@sea9.org",
@@ -47,9 +47,10 @@
 	},
 	"devDependencies": {
 		"@types/jest": "^26.0.10",
+		"concurrently": "^5.3.0",
 		"jest": "^26.4.2",
-		"ts-jest": "^26.3.0",
-		"rimraf": "^3.0.0"
+		"rimraf": "^3.0.0",
+		"ts-jest": "^26.3.0"
 	},
 	"jest": {
 		"testPathIgnorePatterns": [
