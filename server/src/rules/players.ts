@@ -4,14 +4,14 @@ import { Status } from '..';
 export interface Player {
 	token: string;
 	name: string;
+	status: Status;
 	reinforcement: number; // 0
 	selected?: Territories;
-	status: Status;
-	holdings: Territories[];
-	cards: Record<string, Card>;
 	joined?: string;
 	sessionid?: string;
 	wonBattle?: number;
+	cards: Record<string, Card>;
+	holdings: Territories[];
 };
 
 export const isPlayer = (variable: any): variable is Player => {

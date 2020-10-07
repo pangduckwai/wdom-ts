@@ -87,7 +87,7 @@ export const reducer = (
 								status: Status.New,
 								holdings: [],
 								cards: {},
-								sessionid: event.payload.sessionId
+								sessionid: commit.session
 							};
 						}
 						break;
@@ -519,6 +519,10 @@ export const reducer = (
 							}
 						}
 						break;
+				}
+
+				if (event.payload.playerToken && players[event.payload.playerToken]) {
+					players[event.payload.playerToken].sessionid = commit.session;
 				}
 			}
 			return { players, games, messages };

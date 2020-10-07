@@ -4,9 +4,9 @@ import {
 	_shuffle, rules, Card, Territories, Territory, WildCards, GameStage, Expected, RuleTypes,
 	getValidator, validateNumOfPlayers
 } from '../rules';
-import { FLAG_SHIFT, FLAG_ALT, generateToken } from '..';
+import { FLAG_SHIFT, FLAG_ALT } from '..';
 import {
-	Commit, CommitStore, createCommit, getCommitStore,
+	Commit, createCommit, getCommitStore,
 	PlayerRegistered, PlayerLeft,
 	GameOpened, GameClosed, GameJoined, GameQuitted,
 	PlayerShuffled, GameStarted, TerritoryAssigned,
@@ -35,17 +35,14 @@ export const getCommands = (
 	deck: Record<WildCards | Territories, Card>
 ): Commands => {
 	const validator = getValidator(map, deck);
-	const commitStore: CommitStore = getCommitStore(channel, client);
+	const commitStore = getCommitStore(channel, client);
 	const snapshot = getSnapshot(channel, client);
 
 	return {
 		RegisterPlayer: (payload: { playerName: string }) =>
 			createCommit().addEvent<PlayerRegistered>({
 				type: 'PlayerRegistered',
-				payload: {
-					playerName: payload.playerName,
-					sessionId: generateToken()
-				}
+				payload
 			}).build(commitStore),
 		PlayerLeave: (payload: { playerToken: string }) =>
 			createCommit().addEvent<PlayerLeft>({
@@ -226,7 +223,7 @@ export const getCommands = (
 				return build(commitStore);
 			}
 		},
-		EndTurn: async ({ playerToken, gameToken }: { playerToken: string; gameToken: string }) => {
+		EndTurn: ({ playerToken, gameToken }: { playerToken: string; gameToken: string }) => {
 			return createCommit().addEvent<TurnEnded>({
 				type: 'TurnEnded',
 				payload: { playerToken, gameToken }

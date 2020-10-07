@@ -1,9 +1,8 @@
 require('dotenv').config();
 jest.mock('../rules/card');
 jest.mock('../rules/rules');
-jest.mock('../commands/index');
 import RedisClient, { Redis } from 'ioredis';
-import { BusyTimeout, Commands, getCommands } from '../commands';
+import { Commands, getCommands } from '../commands';
 import { getSnapshot, getSubscriptions, Message, Snapshot, Subscriptions } from '../queries';
 import { buildDeck, buildMap, buildWorld, Game, Player, rules, _shuffle, Territories, RuleTypes } from '../rules';
 import { CHANNEL } from '..';
@@ -45,7 +44,6 @@ Members:${g.players.map(k => {
 	
 const host = process.env.REDIS_HOST;
 const port = (process.env.REDIS_PORT || 6379) as number;
-const timestamp = Date.now();
 const world = buildWorld();
 const map = buildMap();
 const deck = buildDeck();
@@ -97,7 +95,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await new Promise((resolve) => setTimeout(() => {
-		console.log(`Unit test of channel ${channel} finished. Busy timeout ${BusyTimeout}`);
+		console.log(`Unit test of channel ${channel} finished`);
 		resolve();
 	}, 200));
 	subscriptions.stop(channel);

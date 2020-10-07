@@ -32,7 +32,8 @@ export const getSubscriptions = (
 		start: (channel: string): Promise<number> => {
 			const commitStore: CommitStore = getCommitStore(channel, client);
 			const snapshot: Snapshot = getSnapshot(channel, client);
-		
+			const _reducer = reducer(world, map, deck);
+
 			return new Promise<number>(async (resolve, reject) => {
 				if (subscribers[channel]) {
 					reject(new Error(`Channel ${channel} already subscribed`));
@@ -87,7 +88,7 @@ export const getSubscriptions = (
 								const nextId = parseInt(streamId[1], 10) + 1;
 								subscribers[channel].lastPosition = `${streamId[0]}-${nextId}`;
 
-								const results = reducer(world, map, deck)(incomings, {
+								const results = _reducer(incomings, {
 									players: subscribers[channel].players,
 									games: subscribers[channel].games
 								});

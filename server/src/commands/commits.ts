@@ -1,10 +1,11 @@
 import { Redis } from 'ioredis';
-import { deserialize } from '..';
-import { BaseEvent, BusyTimeout } from '.';
+import { deserialize, generateToken } from '..';
+import { BaseEvent } from '.';
 
 export interface Commit {
 	id: string;
 	version: number;
+	session: string;
 	events: BaseEvent[];
 	timestamp?: number;
 };
@@ -47,7 +48,7 @@ this script is called individually
 const put = `
 local sid = redis.call("xadd", KEYS[2], "*", "commit", ARGV[1])
 if sid then
-	redis.call("set", KEYS[3], sid, "px", ${BusyTimeout})
+	redis.call("set", KEYS[3], sid, "px", 3000)
 	redis.call("publish", KEYS[1], sid)
 
 	local cnt = 0
@@ -129,6 +130,7 @@ export const createCommit = (): {
 	const commit: Commit = {
 		id: '',
 		version: 0,
+		session: '',
 		events: []
 	};
 
@@ -137,8 +139,10 @@ export const createCommit = (): {
 			return new Promise<Commit>((_, reject) => {
 				reject(new Error('[createCommit] Invalid parameter(s)'));
 			});
-		else
+		else {
+			commit.session = generateToken();
 			return put(commit);
+		}
 	}
 
 	const addEvent = <E extends BaseEvent>(event: E) => {

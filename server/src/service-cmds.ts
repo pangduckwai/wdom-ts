@@ -23,7 +23,7 @@ const servicePort = (process.env.COMMANDS_PORT || 4000) as number;
 	start()
 		.then(({ url }) => {
 			process.send?.('ready'); // (process.env.NODE_ENV === 'production')
-			console.log(`🚀 WDOM Commands Service started at ${url}`);
+			console.log(`🚀 WDOM Commands Service started at ${url} with channel ${CHANNEL}`);
 		});
 })().catch(error => {
 	console.error(error);

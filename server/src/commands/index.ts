@@ -1,5 +1,5 @@
-import { Redis } from 'ioredis';
-import { Commands } from '.';
+import { Snapshot } from '../queries';
+import { CommitStore, Commands } from '.';
 
 export * from './events';
 export * from './commands';
@@ -7,13 +7,13 @@ export * from './commits';
 export * from './schema';
 export * from './service';
 
-export const BusyTimeout = 900;
-
 export type CommandContext = {
-	client: Redis;
-	channel: string;
+	// client: Redis;
+	// channel: string;
+	snapshot: Snapshot;
 	commands: Commands;
-	sessionid?: string;
+	commitStore: CommitStore;
+	sessionId?: string;
 };
 
 // export type BaseCommands<T> = {

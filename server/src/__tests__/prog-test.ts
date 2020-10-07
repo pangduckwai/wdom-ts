@@ -1,15 +1,13 @@
 require('dotenv').config();
 jest.mock('../rules/card');
-jest.mock('../commands/index');
 import crypto from 'crypto';
 import RedisClient, { Redis } from 'ioredis';
 import { CHANNEL, isEmpty, Status } from '..';
-import { BusyTimeout, getCommitStore, CommitStore, createCommit, TerritorySelected } from '../commands';
+import { getCommitStore, CommitStore, createCommit, TerritorySelected } from '../commands';
 import { buildWorld, buildDeck, buildMap, Card, Continents, Game, Player, _shuffle, shuffle, Territories, WildCards } from '../rules';
 
 const host = process.env.REDIS_HOST;
 const port = (process.env.REDIS_PORT || 6379) as number;
-const timestamp = Date.now();
 const map = buildMap();
 const deck = buildDeck();
 const topic = `${CHANNEL}progtest`;
@@ -24,7 +22,7 @@ beforeAll(async () => {
 afterAll(async () => {
 	await publisher.quit();
 	return new Promise((resolve) => setTimeout(() => {
-		console.log(`Unit test of channel ${CHANNEL} finished. Busy timeout: ${BusyTimeout}`);
+		console.log(`Unit test of channel ${CHANNEL} finished`);
 		resolve();
 	}, 1000));
 });

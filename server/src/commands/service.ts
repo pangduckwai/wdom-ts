@@ -1,7 +1,8 @@
 import { ApolloServer, ServerInfo } from 'apollo-server';
 import RedisClient, { Redis } from 'ioredis';
+import { getSnapshot } from '../queries';
 import { buildDeck, buildMap } from '../rules';
-import { CommandContext, schema, getCommands } from '.';
+import { CommandContext, schema, getCommitStore, getCommands } from '.';
 
 // =================================
 // === Starting Commands Service ===
@@ -45,14 +46,17 @@ export const commandService: (args: {
 	});
 
 	const commands = getCommands(channel, client, buildMap(), buildDeck());
+	const snapshot = getSnapshot(channel, client);
+	const commitStore = getCommitStore(channel, client);
+
 	const service = new ApolloServer({
 		context: async ({ req }) => {
 			const context: CommandContext = {
-				channel, client, commands
+				snapshot, commands, commitStore
 			};
 			const auth = (req.headers && req.headers.authorization) ? req.headers.authorization : null;
 			if (auth) {
-				context.sessionid = auth;
+				context.sessionId = auth;
 			}
 			return context;
 		},

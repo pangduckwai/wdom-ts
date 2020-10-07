@@ -1,7 +1,7 @@
 import { buildFederatedSchema } from '@apollo/federation';
 import { ApolloError } from 'apollo-server-errors';
 import gql from 'graphql-tag';
-import { Commit, CommandContext, getCommands, getCommitStore } from '.';
+import { Commit, CommandContext } from '.';
 
 export const typeDefs = gql`
 type Query {
@@ -11,7 +11,7 @@ type Query {
 
 type Mutation {
 	registerPlayer(playerName: String!): Response!
-	leaveGameRoom(playerToken: String!): Response!
+	leaveGameRoom(): Response!
 	openGame(playerToken: String!, gameName: String!, ruleType: String!): Response!
 	closeGame(playerToken: String!): Response!
 	joinGame(playerToken: String!, gameToken: String!): Response!
@@ -40,6 +40,7 @@ type Event {
 type Commit {
 	id: String!
 	version: Int!
+	session: String!
 	events: [Event]!
 	timestamp: String
 }
@@ -56,18 +57,18 @@ export const resolvers = {
 		__resolveType: (obj: any) => (obj.id) ? 'Commit' : (obj.message) ? 'Error' : {}
 	},
 	Query: {
-		getCommitById: async (_: any, { id }: any, { client, channel }: CommandContext): Promise<Commit | ApolloError> =>
-      getCommitStore(channel, client).get({ id })
+		getCommitById: async (_: any, { id }: any, { commitStore }: CommandContext): Promise<Commit | ApolloError> =>
+			commitStore.get({ id })
 				.then(result => (result.length > 0) ? result[0] : new ApolloError('Invalid result from CommitStore.get()'))
 				.catch(error => new ApolloError(error)),
 		getCommits: async (
-			_: any, { fromTime, toTime }: any, { client, channel }: CommandContext
+			_: any, { fromTime, toTime }: any, { commitStore }: CommandContext
 		): Promise<Commit[] | ApolloError> => {
 			const args = {
         from: fromTime ? fromTime as string : undefined,
         to: toTime ? toTime as string : undefined
       };
-			return getCommitStore(channel, client).get(args)
+			return commitStore.get(args)
 				.then(result => result)
 				.catch(error => new ApolloError(error));
 		},
@@ -77,10 +78,16 @@ export const resolvers = {
 			commands.RegisterPlayer({ playerName })
 				.then(result => result)
 				.catch(error => new ApolloError(error)),
-		// leaveGameRoom: async (_: any, { playerToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.PlayerLeave({ playerToken }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
+		leaveGameRoom: async (_: any, __: any, { snapshot, commands, sessionId }: CommandContext): Promise<Commit | ApolloError> => {
+			if (!sessionId) return new ApolloError('Please register as a player to proceed');
+
+			const { logins } = await snapshot.read();
+			if (!logins[sessionId]) return new ApolloError('Authentication error');
+
+			return commands.PlayerLeave({ playerToken: logins[sessionId] })
+				.then(result => result)
+				.catch(error => new ApolloError(error));
+		},
 		// openGame: async (
 		// 	_: any, { playerToken, gameName }: any, { client, channel }: CommandContext
 		// ): Promise<Commit | Error> =>
