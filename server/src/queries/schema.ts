@@ -1,11 +1,14 @@
 import { buildFederatedSchema } from '@apollo/federation';
+import { ApolloError } from 'apollo-server-errors';
 import gql from 'graphql-tag';
-import { QueryContext } from '.';
+import { Status } from '..';
+import { Message, QueryContext } from '.';
 
 export const typeDefs = gql`
 type Query {
 	me: Self
 	myGame: Game
+	messages(commitId: String!): [Message]
 }
 
 type Self @key(fields: "token") {
@@ -17,7 +20,6 @@ type Self @key(fields: "token") {
 	joined: String
 	cards: [String]!
 	holdings: [Territory]!
-	sessionid: String
 }
 
 type Others @key(fields: "token") {
@@ -43,6 +45,14 @@ type Game @key(fields: "token") {
 type Territory {
 	name: String!
 	troop: Int!
+}
+
+type Message {
+	id: String!
+	type: Int!
+	event: String!
+	message: String!
+	timestamp: String
 }`;
 
 export const resolvers = {
@@ -50,7 +60,7 @@ export const resolvers = {
 		me: async (_: any, __: any, { snapshot, sessionId }: QueryContext): Promise<{
 			token: string;
 			name: string;
-			status: number;
+			status: Status;
 			reinforcement: number;
 			selected?: string;
 			joined?: string;
@@ -60,38 +70,71 @@ export const resolvers = {
 				troop: number;
 			}[];
 			sessionid?: string;
-		} | undefined> => {
-			if (sessionId) {
-				const { logins, players, games } = await snapshot.read();
-				if (logins[sessionId] && players[logins[sessionId]]) {
-					const { wonBattle, joined, cards, holdings, ...player } = players[logins[sessionId]];
-					return {
-						...player,
-						joined,
-						cards: Object.keys(cards),
-						holdings: (joined) ? holdings.map(t => {
-							const { continent, connected, ...rest } = games[joined].map[t];
-							return rest;
-						}) : []
-					};
-				}
+		} | ApolloError> => {
+			if (!sessionId) return new ApolloError('Please register as a player to proceed');
+			try {
+				const { playerToken, players, games } = await snapshot.auth(sessionId);
+				const { wonBattle, joined, cards, holdings, ...player } = players[playerToken];
+				return {
+					...player,
+					joined,
+					cards: Object.keys(cards),
+					holdings: (joined) ? holdings.map(t => {
+						const { continent, connected, ...rest } = games[joined].map[t];
+						return rest;
+					}) : []
+				};
+			} catch (error) {
+				return new ApolloError(error);
 			}
 		},
-		myGame: async (_: any, __: any, { snapshot, sessionId }: QueryContext): Promise<any> => {
-			if (sessionId) {
-				const { logins, players, games } = await snapshot.read();
-				if (logins[sessionId] && players[logins[sessionId]]) {
-					const { joined } = players[logins[sessionId]];
-					if (joined && games[joined]) {
-						const { host, ruleType, redeemed, cards, world, map, players, lastBattle, ...game } = games[joined];
-						return {
-							...game,
-							
-						};
-					}
-				}
-			}
+		myGame: async (_: any, __: any, { snapshot, sessionId }: QueryContext): Promise<{
+			token: string;
+			name: string;
+			status: Status;
+			round: number;
+			turns: number;
+			players: {
+				token: string;
+				name: string;
+				status: Status;
+				selected?: string;
+				joined?: string;
+				holdings: {
+					name: string;
+					troop: number;
+				}[]
+			}[],
+			lastBattleR?: number[];
+			lastBattleW?: number[];
+		} | ApolloError> => {
+			const { playerToken, players, games } = await snapshot.auth(sessionId);
+			const { joined } = players[playerToken];
+			if (!joined || !games[joined]) return new ApolloError('Please open/join a game to proceed');
+			const { host, ruleType, redeemed, cards, world, map, players: tokens, lastBattle, ...game } = games[joined];
+			return {
+				...game,
+				players: tokens.map(p => ({
+					token: p,
+					name: players[p].name,
+					status: players[p].status,
+					selected: players[p].selected,
+					joined: players[p].joined,
+					holdings: players[p].holdings.map(t => ({
+						name: map[t].name, troop: map[t].troop
+					}))
+				})),
+				lastBattleR: lastBattle?.redDice,
+				lastBattleW: lastBattle?.whiteDice
+			};
 		},
+		message: async (_: any, { commitId }: any, { snapshot, messages, sessionId }: QueryContext): Promise<Message[] | ApolloError> => {
+			if (!commitId) return new ApolloError('Invalid parameter specified');
+			const { playerToken, players, games } = await snapshot.auth(sessionId);
+			const { joined } = players[playerToken];
+			if (!joined || !games[joined]) return new ApolloError('Please open/join a game to proceed');
+			return messages(commitId);
+		}
 	}
 };
 

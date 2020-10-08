@@ -61,10 +61,74 @@ export type Snapshot = {
 		games: Record<string, Game>
 	}) => Promise<number>,
 	read: () => Promise<{
-		logins: Record<string, string>,
+		// logins: Record<string, string>,
+		players: Record<string, Player>,
+		games: Record<string, Game>
+	}>,
+	auth: (sessionId?: string) => Promise<{
+		playerToken: string,
 		players: Record<string, Player>,
 		games: Record<string, Game>
 	}>
+};
+
+const readSnapshot = (channel: string, client: Redis): Promise<{
+	logins: Record<string, string>,
+	players: Record<string, Player>,
+	games: Record<string, Game>
+}> => {
+	return new Promise<{
+		logins: Record<string, string>,
+		players: Record<string, Player>,
+		games: Record<string, Game>
+	}>(async (resolve, reject) => {
+		const rtrn: {
+			logins: Record<string, string>,
+			players: Record<string, Player>,
+			games: Record<string, Game>
+		} = {
+			logins: {},
+			players: {},
+			games: {}
+		};
+		const args = [
+			`${channel}:Login`,
+			`${channel}:Player`,
+			`${channel}:Game`,
+			`${channel}:Busy`
+		];
+
+		let retry = 5;
+		let result;
+		do {
+			retry --;
+			await new Promise((resolve) => setTimeout(() => resolve(), 100));
+			result = await client.eval(read, 4, args);
+		} while (!result && retry > 0);
+
+		if (!result) {
+			reject(new Error('Snapshot still busy...'));
+		} else if ((result.length != 3) || (result[0].length & 1) || (result[1].length & 1) || (result[2].length & 1)) {
+			reject(new Error('Invalid result format returned from redis')); // length of result[0], result[1], result[2] must be even
+		} else {
+			for (let h = 0; h < result[0].length; h += 2) {
+				rtrn.logins[result[0][h]] = result[0][h + 1];
+			}
+			try {
+				for (let i = 1; i < result[1].length; i += 2) {
+					const player = deserialize('[Snapshot]', result[1][i], isPlayer);
+					rtrn.players[player.token] = player;
+				}
+				for (let j = 1; j < result[2].length; j += 2) {
+					const game = deserialize('[Snapshot]', result[2][j], isGame);
+					rtrn.games[game.token] = game;
+				}
+				resolve(rtrn);
+			} catch (error) {
+				reject(new Error(error));
+			}
+		}
+	});
 };
 
 export const getSnapshot = (
@@ -79,8 +143,8 @@ export const getSnapshot = (
 			games: Record<string, Game>
 		}): Promise<number> => {
 			return new Promise<number>(async (resolve, reject) => {
-				const playerList = Object.values(players).filter(p => p.status !== Status.Deleted).filter(p => !!p.sessionid);
-				const gameList = Object.values(games).filter(g => g.status !== Status.Deleted);
+				const playerList = Object.values(players).filter(p => p.status !== 'Deleted').filter(p => !!p.sessionid);
+				const gameList = Object.values(games).filter(g => g.status !== 'Deleted');
 				const args = [
 					`${channel}:Login`,
 					`${channel}:Player`,
@@ -107,60 +171,26 @@ export const getSnapshot = (
 			});
 		},
 		read: (): Promise<{
-			logins: Record<string, string>,
+			players: Record<string, Player>,
+			games: Record<string, Game>
+		}> => readSnapshot(channel, client),
+		auth: async (sessionId?: string): Promise<{
+			playerToken: string,
 			players: Record<string, Player>,
 			games: Record<string, Game>
 		}> => {
+			const { logins, players, games } = await readSnapshot(channel, client);
 			return new Promise<{
-				logins: Record<string, string>,
+				playerToken: string,
 				players: Record<string, Player>,
 				games: Record<string, Game>
 			}>(async (resolve, reject) => {
-				const rtrn: {
-					logins: Record<string, string>,
-					players: Record<string, Player>,
-					games: Record<string, Game>
-				} = {
-					logins: {},
-					players: {},
-					games: {}
-				};
-				const args = [
-					`${channel}:Login`,
-					`${channel}:Player`,
-					`${channel}:Game`,
-					`${channel}:Busy`
-				];
-
-				let retry = 5;
-				let result;
-				do {
-					retry --;
-					await new Promise((resolve) => setTimeout(() => resolve(), 100));
-					result = await client.eval(read, 4, args);
-				} while (!result && retry > 0);
-
-				if (!result) {
-					reject(new Error('Snapshot still busy...'));
-				} else if ((result.length != 3) || (result[0].length & 1) || (result[1].length & 1) || (result[2].length & 1)) {
-					reject(new Error('Invalid result format returned from redis')); // length of result[0], result[1], result[2] must be even
+				if (!sessionId || !logins[sessionId] || !players[logins[sessionId]]) {
+					reject('Authentication error');
+				} else if ((players[logins[sessionId]].status !== 'New') && (players[logins[sessionId]].status !== 'Ready')) {
+					reject(`Invalid player (status: ${players[logins[sessionId]].status})`);
 				} else {
-					for (let h = 0; h < result[0].length; h += 2) {
-						rtrn.logins[result[0][h]] = result[0][h + 1];
-					}
-					try {
-						for (let i = 1; i < result[1].length; i += 2) {
-							const player = deserialize('[Snapshot]', result[1][i], isPlayer);
-							rtrn.players[player.token] = player;
-						}
-						for (let j = 1; j < result[2].length; j += 2) {
-							const game = deserialize('[Snapshot]', result[2][j], isGame);
-							rtrn.games[game.token] = game;
-						}
-						resolve(rtrn);
-					} catch (error) {
-						reject(new Error(error));
-					}
+					resolve({playerToken: logins[sessionId], players, games});
 				}
 			});
 		}

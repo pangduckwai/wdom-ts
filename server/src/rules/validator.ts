@@ -74,9 +74,9 @@ export const getValidator = (
 				const game = games[gameToken];
 				if (!game) return `Game "${gameToken}" not found`;
 
-				if (game.status === Status.Deleted)
+				if (game.status === 'Deleted')
 					return `Game "${game.name}" already closed`;
-				else if (game.status === Status.Finished)
+				else if (game.status === 'Finished')
 					return `Game "${game.name}" already finished`;
 
 				if ((hostToken) && (game.host !== hostToken))
@@ -151,7 +151,7 @@ export const getValidator = (
 };
 
 export const validateNumOfPlayers = (players: Record<string, Player>, game: Game, option: {checkLack?: boolean, checkFull?: boolean}) => {
-	const playerCnt = game.players.filter(p => players[p].status !== Status.Defeated).length;
+	const playerCnt = game.players.filter(p => players[p].status !== 'Defeated').length;
 	if ((playerCnt < rules.MinPlayerPerGame) && option.checkLack) {
 		return `Not enough players in the game "${game.name}" yet`;
 	} else if ((playerCnt >= rules.MaxPlayerPerGame) && option.checkFull) {

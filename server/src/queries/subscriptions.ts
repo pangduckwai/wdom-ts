@@ -8,7 +8,7 @@ import { getSnapshot, Message, reducer, Snapshot } from '.';
 export type Subscriptions = {
 	start: (channel: string) => Promise<number>;
 	stop: (channel: string) => Promise<void>;
-	report: (channel: string) => Promise<Message[]>;
+	report: (channel: string) => (commitId?: string) => Promise<Message[]>;
 };
 
 export const getSubscriptions = (
@@ -135,19 +135,20 @@ export const getSubscriptions = (
 					resolve();
 			});
 		},
-		report: async (channel: string) => {
-			return new Promise<Message[]>(async (resolve, reject) => {
-				let retry = 5;
-				while (subscribers[channel].busy && retry > 0) {
-					retry --;
-					await new Promise((resolve) => setTimeout(() => resolve(), 100));
-				}
+		report: (channel: string) =>
+			async (commitId?: string) => {
+				return new Promise<Message[]>(async (resolve, reject) => {
+					let retry = 5;
+					while (subscribers[channel].busy && retry > 0) {
+						retry --;
+						await new Promise((resolve) => setTimeout(() => resolve(), 100));
+					}
 
-				if (subscribers[channel].busy)
-					reject(new Error('Subscription still busy...'));
-				else
-					resolve(subscribers[channel].messages);
-			});
-		}
+					if (subscribers[channel].busy)
+						reject(new Error('Subscription still busy...'));
+					else
+						resolve((!commitId) ? subscribers[channel].messages : subscribers[channel].messages.filter(m => m.commitId === commitId));
+				});
+			}
 	};
 }

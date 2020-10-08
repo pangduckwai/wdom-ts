@@ -1,4 +1,4 @@
-import { Snapshot } from '../queries';
+import { Message, Snapshot } from '.';
 
 export * from './messages';
 export * from './reducer';
@@ -9,5 +9,6 @@ export * from './service';
 
 export type QueryContext = {
   snapshot: Snapshot;
+  messages: (commitId?: string) => Promise<Message[]>
   sessionId?: string;
 };

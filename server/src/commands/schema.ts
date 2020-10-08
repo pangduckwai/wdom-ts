@@ -81,36 +81,33 @@ export const resolvers = {
 				.then(result => result)
 				.catch(error => new ApolloError(error)),
 		leaveGameRoom: async (_: any, __: any, { snapshot, commands, sessionId }: CommandContext): Promise<Commit | ApolloError> => {
-			if (!sessionId) return new ApolloError('Please register as a player to proceed');
-			const { logins, players } = await snapshot.read();
-			if (!logins[sessionId] || !players[logins[sessionId]]) return new ApolloError('Authentication error');
-			if ((players[logins[sessionId]].status !== Status.New) && (players[logins[sessionId]].status !== Status.Ready))
-				return new ApolloError('Invalid player');
-
-			return commands.PlayerLeave({ playerToken: logins[sessionId] })
-				.then(result => result)
-				.catch(error => new ApolloError(error));
+			try {
+				const { playerToken } = await snapshot.auth(sessionId);
+				return commands.PlayerLeave({ playerToken });
+			} catch (error) {
+				return new ApolloError(error);
+			}
 		},
 		openGame: async (
 			_: any, { gameName, ruleType }: any, { snapshot, commands, sessionId }: CommandContext
 		): Promise<Commit | ApolloError> => {
-			if (!sessionId) return new ApolloError('Please register as a player to proceed');
-			const { logins, players } = await snapshot.read();
-			if (!logins[sessionId] || !players[logins[sessionId]]) return new ApolloError('Authentication error');
-			if ((players[logins[sessionId]].status !== Status.New) && (players[logins[sessionId]].status !== Status.Ready))
-				return new ApolloError('Invalid player');
-
-			return commands.OpenGame({
-				playerToken: logins[sessionId],
-				gameName,
-				ruleType: ruleType as RuleTypes
-			}).then(result => result)
-				.catch(error => new ApolloError(error));
+			try {
+				const { playerToken } = await snapshot.auth(sessionId);
+				return commands.OpenGame({
+					playerToken,
+					gameName,
+					ruleType: ruleType as RuleTypes
+				});
+			} catch (error) {
+				return new ApolloError(error);
+			}
 		},
-		// closeGame: async (_: any,{ playerToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.CloseGame({ playerToken }))
+		// closeGame: async (_: any, __: any, { snapshot, commands, sessionId }: CommandContext): Promise<Commit | ApolloError> => {
+
+		// 	return commands.CloseGame({ playerToken })
 		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
+		// 		.catch(error => new ApolloError(error));
+		// },
 		// joinGame: async (
 		// 	_: any, { playerToken, gameToken }: any, { client, channel }: CommandContext
 		// ): Promise<Commit | Error> =>

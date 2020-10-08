@@ -41,7 +41,7 @@ const turnEnded = (
 			wrapped = true;
 		}
 	} while (
-		(players[games[gameToken].players[games[gameToken].turns]].status === Status.Defeated) &&
+		(players[games[gameToken].players[games[gameToken].turns]].status === 'Defeated') &&
 		(games[gameToken].turns !== curr) // Extra checking to avoid infinite loop, when turn go back to the curr player, his/her status should still be valid
 	);
 	if (games[gameToken].turns === curr) {
@@ -84,7 +84,7 @@ export const reducer = (
 								token: commit.id,
 								name: event.payload.playerName,
 								reinforcement: 0,
-								status: Status.New,
+								status: 'New',
 								holdings: [],
 								cards: {},
 								sessionid: commit.session
@@ -100,7 +100,7 @@ export const reducer = (
 							if (players[event.payload.playerToken].joined) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] please quit any current game before leaving`));
 							} else {
-								players[event.payload.playerToken].status = Status.Deleted;
+								players[event.payload.playerToken].status = 'Deleted';
 							}
 						}
 						break;
@@ -125,7 +125,7 @@ export const reducer = (
 										round: -1,
 										redeemed: 0,
 										turns: 0,
-										status: Status.New,
+										status: 'New',
 										players: [event.payload.playerToken],
 										cards: [],
 										world: buildWorld(),
@@ -151,7 +151,7 @@ export const reducer = (
 									if (games[joinedToken].round >= 0) {
 										messages.push(buildMessage(commit.id, MessageType.Error, event.type, `Game "${games[joinedToken].name}" in progress and cannot be closed`));
 									} else {
-										games[joinedToken].status = Status.Deleted;
+										games[joinedToken].status = 'Deleted';
 										for (const player of Object.values(players).filter(player => player.joined && (player.joined === joinedToken))) {
 											player.joined = undefined;
 										}
@@ -274,13 +274,13 @@ export const reducer = (
 							if (error) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 							} else {
-								games[event.payload.gameToken].status = Status.Ready;
+								games[event.payload.gameToken].status = 'Ready';
 								games[event.payload.gameToken].round = 0;
 								games[event.payload.gameToken].turns = 0; // First player start game setup
 
 								const playerLen = games[event.payload.gameToken].players.length; // ReinforcementArrived
 								for (const p of games[event.payload.gameToken].players) {
-									players[p].status = Status.Ready;
+									players[p].status = 'Ready';
 									players[p].reinforcement = rules.initialTroops(playerLen) - players[p].holdings.length;
 								}
 							}
@@ -386,16 +386,16 @@ export const reducer = (
 
 									if (players[payload0.toPlayer].holdings.length <= 0) {
 										// Player defeated!!!
-										players[payload0.toPlayer].status = Status.Defeated;
+										players[payload0.toPlayer].status = 'Defeated';
 										players[payload0.fromPlayer].cards = {
 											...players[payload0.fromPlayer].cards,
 											...players[payload0.toPlayer].cards
 										};
 										players[payload0.toPlayer].cards = {};
 
-										if (games[payload0.gameToken].players.filter(p => players[p].status !== Status.Defeated).length === 1) {
+										if (games[payload0.gameToken].players.filter(p => players[p].status !== 'Defeated').length === 1) {
 											// Player won the game!!!!
-											games[payload0.gameToken].status = Status.Finished;
+											games[payload0.gameToken].status = 'Finished';
 										}
 									}
 								}

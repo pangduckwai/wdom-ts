@@ -21,6 +21,7 @@ export const FLAG_SHIFT = 1; // 0001
 export const FLAG_ALT = 2;   // 0010
 export const FLAG_CTRL = 4;  // 0100
 
-export enum Status {
-  Deleted, New, Ready, Defeated, Finished
-};
+export const Status = [
+  'Deleted', 'New', 'Ready', 'Defeated', 'Finished'
+] as const;
+export type Status = typeof Status[number];

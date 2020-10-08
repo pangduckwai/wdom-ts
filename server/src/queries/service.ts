@@ -50,7 +50,7 @@ export const queryService: (args: {
 	const service = new ApolloServer({
 		context: async ({ req }) => {
 			const context: QueryContext = {
-				snapshot
+				snapshot, messages: subscriptions.report(channel)
 			};
 			const auth = (req.headers && req.headers.authorization) ? req.headers.authorization : null;
 			if (auth) {

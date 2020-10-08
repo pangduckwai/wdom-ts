@@ -8,7 +8,6 @@ import { buildDeck, buildMap, buildWorld, Game, Player, rules, _shuffle } from '
 import { Status } from '..';
 
 const CHANNEL = `wdom${Date.now}`;
-const statusName = ['Deleted ', 'New     ', 'Ready   ', 'Defeated', 'Finished'];
 const output = (
 	reports: {
 		players: Record<string, Player>;
@@ -21,18 +20,18 @@ const output = (
 	const y = Object.values(reports.games).filter(g => g.host === x)[0].token;
 	const g = reports.games[y];
 	const output = 
-`>>> "${g.name}" [status: ${statusName[g.status].trim()}] [round: ${g.round}] [turn: ${g.turns}] [redeemed: ${g.redeemed}] ${(g.lastBattle ? `[red: ${g.lastBattle.redDice}; white: ${g.lastBattle.whiteDice}]` : '')}
+`>>> "${g.name}" [status: ${g.status}] [round: ${g.round}] [turn: ${g.turns}] [redeemed: ${g.redeemed}] ${(g.lastBattle ? `[red: ${g.lastBattle.redDice}; white: ${g.lastBattle.whiteDice}]` : '')}
 Card deck: ${g.cards.map(c => ` ${c.name}(${['W','A','C','I'][c.type]})`)}
 Members:${g.players.map(k => {
 	const p = reports.players[k];
-	return `\n  ${k === x ? '*' : '-' } "${p.name}" [status: ${statusName[p.status].trim()}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"] [selected: ${reports.players[k].selected}]
+	return `\n  ${k === x ? '*' : '-' } "${p.name}" [status: ${p.status}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"] [selected: ${reports.players[k].selected}]
 ....holdings:${p.holdings.map(t => ` ${g.map[t].name}[${g.map[t].troop}]`)}
 ....cards   :${Object.values(p.cards).map(c => ` ${c.name}(${['W','A','C','I'][c.type]})`)}`;
 })}`;
 	console.log(output.replace(/[.][.][.][.]/gi, '    '));
 
 	const room = `Game room:${Object.values(reports.players).map(p => {
-		return `\n "${p.name}" [token: ${p.token}] [status: ${statusName[p.status]}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"]`;
+		return `\n "${p.name}" [token: ${p.token}] [status: ${p.status}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"]`;
 	})}`;
 	console.log(room);
 
@@ -62,6 +61,7 @@ let subscriber: Redis;
 let commands: Commands;
 let snapshot: Snapshot;
 let subscriptions: Subscriptions;
+let messages: (commitId?: string) => Promise<Message[]>
 let reports: {
 	players: Record<string, Player>;
 	games: Record<string, Game>;
@@ -81,11 +81,12 @@ beforeAll(async () => {
 	}
 
 	await subscriptions.start(channel)
+	messages = subscriptions.report(channel);
 });
 
 afterAll(async () => {
 	const { players, games } = await snapshot.read();
-	reports = { players, games, messages: await subscriptions.report(channel) };
+	reports = { players, games, messages: await messages() };
 	await new Promise((resolve) => setTimeout(() => {
 		console.log(`Unit test of channel ${channel} finished`);
 		resolve();
@@ -102,7 +103,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 			await commands.RegisterPlayer({ playerName: playerName });
 		}
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(Object.values(players).map(p => p.name).sort()).toEqual(playerNames.sort());
 	});
 
@@ -111,21 +112,21 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 			await commands.PlayerLeave({ playerToken: player.token });
 		}
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(Object.values(reports.players).filter(p => p.name === 'bill' || p.name === 'dave').length).toEqual(0);
 	});
 
 	it('add duplicated player name', async () => {
 		await commands.RegisterPlayer({ playerName: 'josh' });
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[josh] already registered').length).toEqual(1);
 	});
 
 	it('non-existing player leave', async () => {
 		await commands.PlayerLeave({ playerToken: '1234567890' });
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === 'Player "1234567890" not found').length).toEqual(1);
 	});
 
@@ -136,7 +137,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 			await commands.OpenGame({ playerToken, gameName, ruleType: 'TRADITIONAL' });
 		}
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(Object.values(reports.games).map(g => g.name).sort()).toEqual(Object.keys(gameHosts).map(n => `${n}'s game`).sort());
 	});
 
@@ -150,7 +151,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 			}
 		}
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		for (const hostName of Object.keys(gameHosts)) {
 			const hostToken = Object.values(reports.players).filter(p => p.name === hostName)[0].token;
 			expect(
@@ -169,7 +170,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
 		await commands.JoinGame({ playerToken, gameToken });
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[pete] cannot join your own game').length).toEqual(1);
 	});
 
@@ -177,7 +178,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'saul')[0].token;
 		await commands.CloseGame({ playerToken });
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(Object.values(reports.games).filter(g => g.name === 'saul\'s game').length).toEqual(0);
 		expect(Object.values(reports.players)
 			.filter(p => (p.name === 'saul') || (p.name === 'nick') || (p.name === 'mike') || (p.name === 'john'))
@@ -188,7 +189,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'matt')[0].token;
 		await commands.CloseGame({ playerToken });
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[matt] is not the host of game "josh\'s game"').length).toEqual(1);
 	});
 
@@ -201,7 +202,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 			await commands.JoinGame({ playerToken, gameToken });
 		}
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(
 			Object.values(reports.games)
 				.filter(g => g.host === hostToken)[0]
@@ -221,7 +222,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'jess')[0].token;
 		await commands.QuitGame({ playerToken });
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].joined).toBeUndefined();
 	});
 
@@ -229,7 +230,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'pete')[0].token;
 		await commands.QuitGame({ playerToken });
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[pete] cannot quit from the game you are hosting').length).toEqual(1);
 	});
 
@@ -237,7 +238,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		const playerToken = Object.values(reports.players).filter(p => p.name === 'dick')[0].token;
 		await commands.QuitGame({ playerToken });
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[dick] is not in any game currently').length).toEqual(1);
 	});
 
@@ -254,7 +255,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		const gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
 		await commands.JoinGame({ playerToken, gameToken });
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === 'Game "josh\'s game" already full').length).toEqual(1);
 	});
 
@@ -263,7 +264,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		const gameToken = Object.values(reports.games).filter(g => g.host === playerToken)[0].token;
 		await commands.StartGame({ playerToken, gameToken });
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 
 		const cards = reports.games[gameToken].cards.map(c => c.name);
 		expect(cards.length).toEqual(44);
@@ -291,7 +292,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 
 	beforeAll(async () => {
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		hostToken = Object.values(reports.players).filter(p => p.name === 'josh')[0].token;
 		gameToken = Object.values(reports.games).filter(g => g.host === hostToken)[0].token;
 	});
@@ -321,7 +322,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			reports.games = games;
 			count ++;
 		}
-		reports.messages = await subscriptions.report(channel);
+		reports.messages = await messages();
 		expect(reports.games[gameToken].turns).toEqual(0);
 	});
 
@@ -351,7 +352,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			reports.games = games;
 			count ++;
 		}
-		reports.messages = await subscriptions.report(channel);
+		reports.messages = await messages();
 		expect(reports.games[gameToken].players.filter(p => reports.players[p].holdings.length === 7).length).toEqual(6);
 	});
 
@@ -371,7 +372,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			reports.games = games;
 			count ++;
 		}
-		reports.messages = await subscriptions.report(channel);
+		reports.messages = await messages();
 		expect(reports.games[gameToken].turns).toEqual(4);
 	});
 
@@ -385,7 +386,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			flag: 2
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.games[gameToken].turns).toEqual(5);
 	});
 
@@ -405,7 +406,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			reports.games = games;
 			count ++;
 		}
-		reports.messages = await subscriptions.report(channel);
+		reports.messages = await messages();
 		expect(reports.games[gameToken].turns).toEqual(0);
 		expect(reports.players[reports.games[gameToken].players[reports.games[gameToken].turns]].reinforcement).toEqual(3);
 	});
@@ -422,7 +423,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'Indonesia', amount: 2
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Indonesia');
 		expect(reports.games[gameToken].map['Indonesia'].troop).toEqual(3);
 	});
@@ -439,7 +440,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Venezuela');
 		expect(reports.games[gameToken].map['Venezuela'].troop).toEqual(4);
 	});
@@ -456,7 +457,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'North-Africa', amount: 8
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('North-Africa');
 		expect(reports.games[gameToken].map['North-Africa'].troop).toEqual(9);
 	});
@@ -473,7 +474,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'East-Africa', amount: 9
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('East-Africa');
 		expect(reports.games[gameToken].map['East-Africa'].troop).toEqual(10);
 	});
@@ -490,7 +491,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Mexico');
 		expect(reports.games[gameToken].map['Mexico'].troop).toEqual(1);
 	});
@@ -507,7 +508,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Siam');
 		expect(reports.games[gameToken].map['Siam'].troop).toEqual(1);
 	});
@@ -524,7 +525,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Siam');
 		expect(reports.games[gameToken].map['Siam'].troop).toEqual(3);
 	});
@@ -541,7 +542,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Brazil');
 		expect(reports.games[gameToken].map['Brazil'].troop).toEqual(3);
 	});
@@ -558,7 +559,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Venezuela');
 		expect(reports.games[gameToken].map['Venezuela'].troop).toEqual(8);
 	});
@@ -575,7 +576,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Kamchatka');
 		expect(reports.games[gameToken].map['Kamchatka'].troop).toEqual(6);
 	});
@@ -592,7 +593,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Iceland');
 		expect(reports.games[gameToken].map['Iceland'].troop).toEqual(3);
 	});
@@ -609,7 +610,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'Siam', amount: 3
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Siam');
 		expect(reports.games[gameToken].map['Middle-East'].troop).toEqual(5);
 	});
@@ -626,7 +627,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Ontario');
 		expect(reports.games[gameToken].map['Ontario'].troop).toEqual(3);
 	});
@@ -644,7 +645,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'Brazil', flag: 2
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Brazil');
 		expect(reports.games[gameToken].map['Ontario'].troop).toEqual(7);
 	});
@@ -655,7 +656,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[john] please redeem cards before continuing').length).toEqual(1);
 	});
 
@@ -665,7 +666,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'North-Africa', amount: 1
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[john] please redeem cards before continuing').length).toEqual(2);
 	});
 
@@ -682,7 +683,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, cardNames: ['Egypt', 'North-Africa', 'Ontario']
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[john] does not own the "North-Africa" card').length).toEqual(1);
 		expect(reports.messages.filter(m => m.message === 'Card "Egypt" is not free to return to the deck').length).toEqual(1);
 		expect(reports.messages.filter(m => m.message === 'Card "North-Africa" already in the deck').length).toEqual(1);
@@ -695,7 +696,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, cardNames: ['Afghanistan', 'Egypt', 'Ontario']
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[john] does not own the "Afghanistan" card').length).toEqual(1);
 		expect(reports.messages.filter(m => m.message === 'Card "Egypt" is not free to return to the deck').length).toEqual(2);
 		expect(reports.messages.filter(m => m.message === 'Card "Afghanistan" is not free to return to the deck').length).toEqual(1);
@@ -726,7 +727,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, cardNames: ['Egypt', 'Ontario', 'East-Africa']
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].reinforcement).toEqual(4);
 	});
 
@@ -736,7 +737,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[john] all reinforcement need to be deployed before ending a turn').length).toEqual(1);
 	});
 
@@ -746,7 +747,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'North-Africa', amount: 1
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.messages.filter(m => m.message === '[john] all reinforcement need to be deployed before fortification').length).toEqual(1);
 	});
 
@@ -781,7 +782,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'North-Africa', amount: 4
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('North-Africa');
 		expect(reports.games[gameToken].map['North-Africa'].troop).toEqual(5);
 	});
@@ -805,7 +806,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'North-Africa', amount: 2
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('North-Africa');
 		expect(reports.games[gameToken].map['North-Africa'].troop).toEqual(3);
 	});
@@ -822,7 +823,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'China', amount: 3
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('China');
 		expect(reports.games[gameToken].map['Irkutsk'].troop).toEqual(5);
 	});
@@ -845,7 +846,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'North-Africa', amount: 3
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('North-Africa');
 		expect(reports.games[gameToken].map['North-Africa'].troop).toEqual(4);
 	});
@@ -865,7 +866,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, territoryName: 'Manchuria', amount: 3
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Manchuria');
 		expect(reports.games[gameToken].map['Manchuria'].troop).toEqual(4);
 	});
@@ -885,7 +886,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Alaska');
 		expect(reports.games[gameToken].map['Alaska'].troop).toEqual(4);
 	});
@@ -903,7 +904,7 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			playerToken, gameToken, cardNames: ['Kamchatka', 'Afghanistan', 'Manchuria']
 		});
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].reinforcement).toEqual(21);
 	});
 
@@ -926,9 +927,9 @@ describe('Integration tests - Game Play - Traditional initial territory claiming
 			});
 		}
 		const { players, games } = await snapshot.read();
-		reports = { players, games, messages: await subscriptions.report(channel) };
+		reports = { players, games, messages: await messages() };
 		expect(reports.players[playerToken].selected).toEqual('Scandinavia');
 		expect(reports.games[gameToken].map['Scandinavia'].troop).toEqual(2);
-		expect(reports.games[gameToken].status).toEqual(Status.Finished);
+		expect(reports.games[gameToken].status).toEqual('Finished');
 	});
 });
