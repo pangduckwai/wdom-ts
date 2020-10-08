@@ -15,8 +15,7 @@ export const deserialize = <T>(tag: string, str: string, typeGuard: (x: any) => 
 		throw new Error(`${tag} Unknown object type ${str}`);
 };
 
-export const generateToken = (len = 16) =>
-	crypto.createHash('sha256').update(crypto.randomBytes(len).toString('hex')).digest('base64');
+export const generateToken = (len?: number) => crypto.randomBytes(len || 16).toString('base64');
 
 export const FLAG_SHIFT = 1; // 0001
 export const FLAG_ALT = 2;   // 0010

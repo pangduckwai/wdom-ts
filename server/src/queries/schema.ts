@@ -1,5 +1,4 @@
 import { buildFederatedSchema } from '@apollo/federation';
-import { ApolloError } from 'apollo-server-errors';
 import gql from 'graphql-tag';
 import { QueryContext } from '.';
 
@@ -74,6 +73,21 @@ export const resolvers = {
 							const { continent, connected, ...rest } = games[joined].map[t];
 							return rest;
 						}) : []
+					};
+				}
+			}
+		},
+		myGame: async (_: any, __: any, { snapshot, sessionId }: QueryContext): Promise<any> => {
+			if (sessionId) {
+				const { logins, players, games } = await snapshot.read();
+				if (logins[sessionId] && players[logins[sessionId]]) {
+					const { joined } = players[logins[sessionId]];
+					if (joined && games[joined]) {
+						const { host, ruleType, redeemed, cards, world, map, players, lastBattle, ...game } = games[joined];
+						return {
+							...game,
+							
+						};
 					}
 				}
 			}

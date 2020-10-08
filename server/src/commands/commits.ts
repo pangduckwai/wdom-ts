@@ -140,7 +140,7 @@ export const createCommit = (): {
 				reject(new Error('[createCommit] Invalid parameter(s)'));
 			});
 		else {
-			commit.session = generateToken();
+			commit.session = generateToken(128);
 			return put(commit);
 		}
 	}

@@ -4,7 +4,7 @@ jest.mock('../rules/rules');
 import RedisClient, { Redis } from 'ioredis';
 import { Commands, getCommands } from '../commands';
 import { getSnapshot, getSubscriptions, Message, Snapshot, Subscriptions } from '../queries';
-import { buildDeck, buildMap, buildWorld, Game, Player, rules, _shuffle, Territories, RuleTypes } from '../rules';
+import { buildDeck, buildMap, buildWorld, Game, Player, rules, _shuffle, Territories } from '../rules';
 
 const CHANNEL = `wdom${Date.now}`;
 const statusName = ['Deleted ', 'New     ', 'Ready   ', 'Defeated', 'Finished'];
@@ -141,7 +141,7 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		for (const hostName of Object.keys(gameHosts)) {
 			const playerToken = Object.values(reports.players).filter(p => p.name === hostName)[0].token;
 			const gameName = `${hostName}'s game`;
-			await commands.OpenGame({ playerToken, gameName, ruleType: RuleTypes.SETUP_RANDOM });
+			await commands.OpenGame({ playerToken, gameName, ruleType: 'RANDOM' });
 		}
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };

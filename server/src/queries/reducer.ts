@@ -3,7 +3,7 @@ import { Status } from '..';
 import {
 	buildMap, buildWorld,
 	Card, Game, Player, rules, _shuffle, Territories, WildCards, Territory,
-	Continents, Continent, getValidator, GameStage, Expected, RuleTypes,
+	Continents, Continent, getValidator, GameStage, Expected,
 	validateNumOfPlayers
 } from '../rules';
 import { buildMessage, Message, MessageType } from '.';
@@ -225,7 +225,7 @@ export const reducer = (
 						break;
 
 					case 'TerritoryAssigned':
-						if (games[event.payload.gameToken].ruleType === RuleTypes.SETUP_RANDOM) {
+						if (games[event.payload.gameToken].ruleType === 'RANDOM') {
 							error = validate({
 								playerToken: event.payload.playerToken,
 								hostToken: event.payload.playerToken,
@@ -252,7 +252,7 @@ export const reducer = (
 								const player = players[playerToken];
 								player.holdings.push(event.payload.territory as Territories);
 								games[event.payload.gameToken].map[event.payload.territory as Territories].troop = 1;
-								if (games[event.payload.gameToken].ruleType === RuleTypes.SETUP_TRADITIONAL) player.reinforcement --;
+								if (games[event.payload.gameToken].ruleType === 'TRADITIONAL') player.reinforcement --;
 								games[event.payload.gameToken].turns ++;
 								if (games[event.payload.gameToken].turns >= games[event.payload.gameToken].players.length)
 									games[event.payload.gameToken].turns = 0;

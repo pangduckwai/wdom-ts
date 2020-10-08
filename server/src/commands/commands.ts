@@ -55,7 +55,7 @@ export const getCommands = (
 				payload: {
 					playerToken: payload.playerToken,
 					gameName: payload.gameName,
-					ruleType: payload.ruleType ? payload.ruleType : RuleTypes.SETUP_TRADITIONAL
+					ruleType: payload.ruleType ? payload.ruleType : 'TRADITIONAL'
 				}
 			}).build(commitStore),
 		CloseGame: (payload: { playerToken: string }) =>
@@ -97,7 +97,7 @@ export const getCommands = (
 							players: tokens
 						}
 					});
-					if (games[payload.gameToken].ruleType === RuleTypes.SETUP_RANDOM) {
+					if (games[payload.gameToken].ruleType === 'RANDOM') {
 						for (const territory of _shuffle(Territories.map(t => t))) {
 							addEvent<TerritoryAssigned>({
 								type: 'TerritoryAssigned',
@@ -158,7 +158,7 @@ export const getCommands = (
 						}
 						const unclaimed = Object.values(game.map).filter(t => t.troop <= 0).length;
 						if ((game.round > 0) || // After setup phase
-								(game.ruleType === RuleTypes.SETUP_RANDOM) || // Setup phase (game.round == 0) using random assign initial territories rule
+								(game.ruleType === 'RANDOM') || // Setup phase (game.round == 0) using random assign initial territories rule
 								(unclaimed <= 0)) { // Setup phase, all territories claimed, traditional rule
 							addEvent<TroopPlaced>({
 								type: 'TroopPlaced',

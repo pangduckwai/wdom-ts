@@ -1,10 +1,11 @@
 import { Card, Continents, Continent, Territories, Territory } from '.';
 import { Status } from '..';
 
-export enum RuleTypes {
-	SETUP_TRADITIONAL, // Player take turns to claim territories during the setup phase
-	SETUP_RANDOM, // The system randomly assign initial territories to players
-};
+export const RuleTypes = [
+	'TRADITIONAL', // Player take turns to claim territories during the setup phase
+	'RANDOM' // The system randomly assign initial territories to players
+] as const;
+export type RuleTypes = typeof RuleTypes[number];
 
 export interface Game {
 	token: string;

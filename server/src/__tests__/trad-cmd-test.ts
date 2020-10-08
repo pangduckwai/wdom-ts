@@ -4,7 +4,7 @@ jest.mock('../rules/rules');
 import RedisClient, { Redis } from 'ioredis';
 import { Commands, getCommands } from '../commands';
 import { getSnapshot, getSubscriptions, Message, Snapshot, Subscriptions } from '../queries';
-import { buildDeck, buildMap, buildWorld, Game, Player, rules, _shuffle, RuleTypes } from '../rules';
+import { buildDeck, buildMap, buildWorld, Game, Player, rules, _shuffle } from '../rules';
 import { Status } from '..';
 
 const CHANNEL = `wdom${Date.now}`;
@@ -133,7 +133,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 		for (const hostName of Object.keys(gameHosts)) {
 			const playerToken = Object.values(reports.players).filter(p => p.name === hostName)[0].token;
 			const gameName = `${hostName}'s game`;
-			await commands.OpenGame({ playerToken, gameName, ruleType: RuleTypes.SETUP_TRADITIONAL });
+			await commands.OpenGame({ playerToken, gameName, ruleType: 'TRADITIONAL' });
 		}
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await subscriptions.report(channel) };
