@@ -14,7 +14,7 @@ type Query {
 type Self @key(fields: "token") {
 	token: String!
 	name: String!
-	status: Int!
+	status: String!
 	reinforcement: Int!
 	selected: String
 	joined: String
@@ -25,7 +25,7 @@ type Self @key(fields: "token") {
 type Others @key(fields: "token") {
 	token: String!
 	name: String!
-	status: Int!
+	status: String!
 	selected: String
 	joined: String
 	holdings: [Territory]!
@@ -34,7 +34,7 @@ type Others @key(fields: "token") {
 type Game @key(fields: "token") {
 	token: String!
 	name: String!
-	status: Int!
+	status: String!
 	round: Int!
 	turns: Int!
 	players: [Others]!
@@ -48,9 +48,9 @@ type Territory {
 }
 
 type Message {
-	id: String!
+	commitId: String!
 	type: Int!
-	event: String!
+	eventName: String!
 	message: String!
 	timestamp: String
 }`;
@@ -128,11 +128,11 @@ export const resolvers = {
 				lastBattleW: lastBattle?.whiteDice
 			};
 		},
-		message: async (_: any, { commitId }: any, { snapshot, messages, sessionId }: QueryContext): Promise<Message[] | ApolloError> => {
+		messages: async (_: any, { commitId }: any, { snapshot, messages, sessionId }: QueryContext): Promise<Message[] | ApolloError> => {
 			if (!commitId) return new ApolloError('Invalid parameter specified');
-			const { playerToken, players, games } = await snapshot.auth(sessionId);
-			const { joined } = players[playerToken];
-			if (!joined || !games[joined]) return new ApolloError('Please open/join a game to proceed');
+			await snapshot.auth(sessionId);
+			// const { joined } = players[playerToken];
+			// if (!joined || !games[joined]) return new ApolloError('Please open/join a game to proceed');
 			return messages(commitId);
 		}
 	}

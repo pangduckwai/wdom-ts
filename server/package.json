@@ -12,8 +12,8 @@
 		"cmd-test": "jest cmd-test",
 		"rand-cmd-test": "jest rand-cmd-test",
 		"trad-cmd-test": "jest trad-cmd-test",
-		"command": "node dist/service-cmds.js %TS%",
-		"queries": "node dist/service-qrys.js %TS%",
+		"command": "nodemon dist/service-cmds.js %TS%",
+		"queries": "nodemon dist/service-qrys.js %TS%",
 		"start": "npm run build && set TS=%DATE: =-%@%TIME: =0% && concurrently \"npm:command\" \"npm:queries\""
 	},
 	"repository": "https://github.com/pangduckwai/wdom-ts.git",
