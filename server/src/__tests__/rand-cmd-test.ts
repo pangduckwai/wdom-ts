@@ -6,7 +6,7 @@ import { Commands, getCommands } from '../commands';
 import { getSnapshot, getSubscriptions, Message, Snapshot, Subscriptions } from '../queries';
 import { buildDeck, buildMap, buildWorld, Game, Player, rules, _shuffle, Territories } from '../rules';
 
-const CHANNEL = `wdom${Date.now}`;
+const CHANNEL = `wdom${Date.now()}`;
 const output = (
 	reports: {
 		players: Record<string, Player>;
@@ -281,7 +281,7 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		const holdings = reports.players[playerToken].holdings;
 		expect(holdings.length).toEqual(7);
 		expect(holdings[5]).toEqual('Eastern-United-States');
-		expect(reports.games[gameToken].status).toEqual(2);
+		expect(reports.games[gameToken].status).toEqual('Ready');
 		expect(reports.players[playerToken].reinforcement).toEqual(rules.initialTroops(6) - reports.players[playerToken].holdings.length);
 	});
 

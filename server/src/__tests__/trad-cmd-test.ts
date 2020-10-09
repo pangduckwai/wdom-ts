@@ -5,9 +5,8 @@ import RedisClient, { Redis } from 'ioredis';
 import { Commands, getCommands } from '../commands';
 import { getSnapshot, getSubscriptions, Message, Snapshot, Subscriptions } from '../queries';
 import { buildDeck, buildMap, buildWorld, Game, Player, rules, _shuffle } from '../rules';
-import { Status } from '..';
 
-const CHANNEL = `wdom${Date.now}`;
+const CHANNEL = `wdom${Date.now()}`;
 const output = (
 	reports: {
 		players: Record<string, Player>;
@@ -272,7 +271,7 @@ describe('Integration tests - Game Room - Traditional initial territory claiming
 
 		const holdings = reports.players[playerToken].holdings;
 		expect(holdings.length).toEqual(0);
-		expect(reports.games[gameToken].status).toEqual(2);
+		expect(reports.games[gameToken].status).toEqual('Ready');
 		expect(reports.players[playerToken].reinforcement).toEqual(rules.initialTroops(6) - reports.players[playerToken].holdings.length);
 	});
 });

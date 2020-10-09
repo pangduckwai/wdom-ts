@@ -2,7 +2,7 @@ require('dotenv').config();
 import crypto from 'crypto'; 
 import RedisClient, { Redis } from 'ioredis';
 
-const CHANNEL = `wdom${Date.now}`;
+const CHANNEL = `wdom${Date.now()}`;
 const generateToken = () =>
 	crypto.createHash('sha256').update(crypto.randomBytes(16).toString('hex')).digest('base64');
 
