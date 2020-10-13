@@ -55,9 +55,9 @@ export const rules = {
 	},
 	isRedeemable: (cards: Card[]) => {
 		if (cards.length < 3) return false;
-		let a = cards.filter(c => (c.type === 1) || (c.type === 0));
-		let c = cards.filter(c => (c.type === 2) || (c.type === 0));
-		let i = cards.filter(c => (c.type === 3) || (c.type === 0));
+		let a = cards.filter(c => (c.type === 'Artillery') || (c.type === 'Wildcard'));
+		let c = cards.filter(c => (c.type === 'Cavalry') || (c.type === 'Wildcard'));
+		let i = cards.filter(c => (c.type === 'Infantry') || (c.type === 'Wildcard'));
 		return ((a.length >= 3) || (c.length >= 3) || (i.length >= 3) || ((a.length >= 1) && (c.length >= 1) && (i.length >= 1)));
 	},
 	doBattle: (attacker: number, defender: number) => {

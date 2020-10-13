@@ -8,8 +8,6 @@ export * from './schema';
 export * from './service';
 
 export type CommandContext = {
-	// client: Redis;
-	// channel: string;
 	snapshot: Snapshot;
 	commands: Commands;
 	commitStore: CommitStore;

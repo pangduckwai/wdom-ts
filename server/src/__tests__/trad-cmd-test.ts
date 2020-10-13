@@ -20,12 +20,12 @@ const output = (
 	const g = reports.games[y];
 	const output = 
 `>>> "${g.name}" [status: ${g.status}] [round: ${g.round}] [turn: ${g.turns}] [redeemed: ${g.redeemed}] ${(g.lastBattle ? `[red: ${g.lastBattle.redDice}; white: ${g.lastBattle.whiteDice}]` : '')}
-Card deck: ${g.cards.map(c => ` ${c.name}(${['W','A','C','I'][c.type]})`)}
+Card deck: ${g.cards.map(c => ` ${c.name}(${c.type.substring(0,1)})`)}
 Members:${g.players.map(k => {
 	const p = reports.players[k];
 	return `\n  ${k === x ? '*' : '-' } "${p.name}" [status: ${p.status}] [reinforcement: ${p.reinforcement}] [joined: "${(p.joined ? reports.games[p.joined].name : '')}"] [selected: ${reports.players[k].selected}]
 ....holdings:${p.holdings.map(t => ` ${g.map[t].name}[${g.map[t].troop}]`)}
-....cards   :${Object.values(p.cards).map(c => ` ${c.name}(${['W','A','C','I'][c.type]})`)}`;
+....cards   :${Object.values(p.cards).map(c => ` ${c.name}(${c.type.substring(0,1)})`)}`;
 })}`;
 	console.log(output.replace(/[.][.][.][.]/gi, '    '));
 

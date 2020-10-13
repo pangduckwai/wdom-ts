@@ -1,11 +1,9 @@
 import { Territories } from '.';
 
-export enum CardTypes {
-	Wildcard,
-	Artillery,
-	Cavalry,
-	Infantry
-};
+export const CardTypes = [
+	'Wildcard', 'Artillery', 'Cavalry', 'Infantry'
+] as const;
+export type CardTypes = typeof CardTypes[number];
 
 export const WildCards = [
 	'Wildcard-1',
@@ -35,136 +33,136 @@ export const _shuffle = <T>(list: T[]): T[] => {
 export const buildDeck = (): Record<WildCards | Territories, Card> => {
 	return {
 		['Wildcard-1']: {
-			name: 'Wildcard-1', type: CardTypes.Wildcard
+			name: 'Wildcard-1', type: 'Wildcard'
 		},
 		['Wildcard-2']: {
-			name: 'Wildcard-2', type: CardTypes.Wildcard
+			name: 'Wildcard-2', type: 'Wildcard'
 		},
 		['Congo']: {
-			name: 'Congo', type: CardTypes.Artillery
+			name: 'Congo', type: 'Artillery'
 		},
 		['East-Africa']: {
-			name: 'East-Africa', type: CardTypes.Infantry
+			name: 'East-Africa', type: 'Infantry'
 		},
 		['Egypt']: {
-			name: 'Egypt', type: CardTypes.Cavalry
+			name: 'Egypt', type: 'Cavalry'
 		},
 		['Madagascar']: {
-			name: 'Madagascar', type: CardTypes.Cavalry
+			name: 'Madagascar', type: 'Cavalry'
 		},
 		['North-Africa']: {
-			name: 'North-Africa', type: CardTypes.Infantry
+			name: 'North-Africa', type: 'Infantry'
 		},
 		['South-Africa']: {
-			name: 'South-Africa', type: CardTypes.Artillery
+			name: 'South-Africa', type: 'Artillery'
 		},
 		['Afghanistan']: {
-			name: 'Afghanistan', type: CardTypes.Infantry
+			name: 'Afghanistan', type: 'Infantry'
 		},
 		['China']: {
-			name: 'China', type: CardTypes.Artillery
+			name: 'China', type: 'Artillery'
 		},
 		['India']: {
-			name: 'India', type: CardTypes.Cavalry
+			name: 'India', type: 'Cavalry'
 		},
 		['Irkutsk']: {
-			name: 'Irkutsk', type: CardTypes.Artillery
+			name: 'Irkutsk', type: 'Artillery'
 		},
 		['Japan']: {
-			name: 'Japan', type: CardTypes.Cavalry
+			name: 'Japan', type: 'Cavalry'
 		},
 		['Kamchatka']: {
-			name: 'Kamchatka', type: CardTypes.Artillery
+			name: 'Kamchatka', type: 'Artillery'
 		},
 		['Manchuria']: {
-			name: 'Manchuria', type: CardTypes.Cavalry
+			name: 'Manchuria', type: 'Cavalry'
 		},
 		['Middle-East']: {
-			name: 'Middle-East', type: CardTypes.Artillery
+			name: 'Middle-East', type: 'Artillery'
 		},
 		['Siam']: {
-			name: 'Siam', type: CardTypes.Cavalry
+			name: 'Siam', type: 'Cavalry'
 		},
 		['Siberia']: {
-			name: 'Siberia', type: CardTypes.Infantry
+			name: 'Siberia', type: 'Infantry'
 		},
 		['Ural']: {
-			name: 'Ural', type: CardTypes.Infantry
+			name: 'Ural', type: 'Infantry'
 		},
 		['Yakutsk']: {
-			name: 'Yakutsk', type: CardTypes.Artillery
+			name: 'Yakutsk', type: 'Artillery'
 		},
 		['Eastern-Australia']: {
-			name: 'Eastern-Australia', type: CardTypes.Cavalry
+			name: 'Eastern-Australia', type: 'Cavalry'
 		},
 		['Indonesia']: {
-			name: 'Indonesia', type: CardTypes.Infantry
+			name: 'Indonesia', type: 'Infantry'
 		},
 		['New-Guinea']: {
-			name: 'New-Guinea', type: CardTypes.Cavalry
+			name: 'New-Guinea', type: 'Cavalry'
 		},
 		['Western-Australia']: {
-			name: 'Western-Australia', type: CardTypes.Artillery
+			name: 'Western-Australia', type: 'Artillery'
 		},
 		['Great-Britain']: {
-			name: 'Great-Britain', type: CardTypes.Infantry
+			name: 'Great-Britain', type: 'Infantry'
 		},
 		['Iceland']: {
-			name: 'Iceland', type: CardTypes.Cavalry
+			name: 'Iceland', type: 'Cavalry'
 		},
 		['Northern-Europe']: {
-			name: 'Northern-Europe', type: CardTypes.Cavalry
+			name: 'Northern-Europe', type: 'Cavalry'
 		},
 		['Scandinavia']: {
-			name: 'Scandinavia', type: CardTypes.Infantry
+			name: 'Scandinavia', type: 'Infantry'
 		},
 		['Southern-Europe']: {
-			name: 'Southern-Europe', type: CardTypes.Infantry
+			name: 'Southern-Europe', type: 'Infantry'
 		},
 		['Ukraine']: {
-			name: 'Ukraine', type: CardTypes.Infantry
+			name: 'Ukraine', type: 'Infantry'
 		},
 		['Western-Europe']: {
-			name: 'Western-Europe', type: CardTypes.Infantry
+			name: 'Western-Europe', type: 'Infantry'
 		},
 		['Alaska']: {
-			name: 'Alaska', type: CardTypes.Artillery
+			name: 'Alaska', type: 'Artillery'
 		},
 		['Alberta']: {
-			name: 'Alberta', type: CardTypes.Artillery
+			name: 'Alberta', type: 'Artillery'
 		},
 		['Eastern-United-States']: {
-			name: 'Eastern-United-States', type: CardTypes.Artillery
+			name: 'Eastern-United-States', type: 'Artillery'
 		},
 		['Greenland']: {
-			name: 'Greenland', type: CardTypes.Cavalry
+			name: 'Greenland', type: 'Cavalry'
 		},
 		['Mexico']: {
-			name: 'Mexico', type: CardTypes.Infantry
+			name: 'Mexico', type: 'Infantry'
 		},
 		['Northwest-Territory']: {
-			name: 'Northwest-Territory', type: CardTypes.Cavalry
+			name: 'Northwest-Territory', type: 'Cavalry'
 		},
 		['Ontario']: {
-			name: 'Ontario', type: CardTypes.Artillery
+			name: 'Ontario', type: 'Artillery'
 		},
 		['Quebec']: {
-			name: 'Quebec', type: CardTypes.Artillery
+			name: 'Quebec', type: 'Artillery'
 		},
 		['Western-United-States']: {
-			name: 'Western-United-States', type: CardTypes.Artillery
+			name: 'Western-United-States', type: 'Artillery'
 		},
 		['Argentina']: {
-			name: 'Argentina', type: CardTypes.Infantry
+			name: 'Argentina', type: 'Infantry'
 		},
 		['Brazil']: {
-			name: 'Brazil', type: CardTypes.Infantry
+			name: 'Brazil', type: 'Infantry'
 		},
 		['Peru']: {
-			name: 'Peru', type: CardTypes.Cavalry
+			name: 'Peru', type: 'Cavalry'
 		},
 		['Venezuela']: {
-			name: 'Venezuela', type: CardTypes.Cavalry
+			name: 'Venezuela', type: 'Cavalry'
 		}
 	};
 };

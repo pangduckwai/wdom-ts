@@ -122,7 +122,7 @@ describe('Programming behaviour tests', () => {
 			if (card) player.cards[card.name] = card;
 		}
 		const type = player.cards['Western-United-States'].type;
-		expect(type).toEqual(1);
+		expect(type).toEqual('Artillery');
 	});
 
 	it('test isEmpty', () => {
