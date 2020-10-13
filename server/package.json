@@ -12,6 +12,7 @@
 		"cmd-test": "jest cmd-test",
 		"rand-cmd-test": "jest rand-cmd-test",
 		"trad-cmd-test": "jest trad-cmd-test",
+		"intg-test": "jest intg-test",
 		"command": "nodemon dist/service-cmds.js %TS%",
 		"queries": "nodemon dist/service-qrys.js %TS%",
 		"start": "npm run build && set TS=%DATE: =-%@%TIME: =0% && concurrently \"npm:command\" \"npm:queries\""

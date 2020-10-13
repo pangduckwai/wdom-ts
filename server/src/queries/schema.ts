@@ -131,8 +131,6 @@ export const resolvers = {
 		messages: async (_: any, { commitId }: any, { snapshot, messages, sessionId }: QueryContext): Promise<Message[] | ApolloError> => {
 			if (!commitId) return new ApolloError('Invalid parameter specified');
 			await snapshot.auth(sessionId);
-			// const { joined } = players[playerToken];
-			// if (!joined || !games[joined]) return new ApolloError('Please open/join a game to proceed');
 			return messages(commitId);
 		}
 	}

@@ -1,17 +1,19 @@
-
-export const REGISTER_PLAYER = `
+export const QUERIES = { 
+RegisterPlayer: ['registerPlayer', `
 mutation RegisterPlayer($playerName: String!) {
 	registerPlayer(playerName: $playerName) {
 		... on Commit {
 			id
 			version
-			timestamp
+      timestamp
+      session
 		}
 		... on Error {
 			message
 		}
 	}
-}`;
+}`]
+};
 
 export const PLAYER_LEAVE = `
 mutation LeaveGameRoom($playerToken: String!) {

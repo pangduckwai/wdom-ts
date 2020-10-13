@@ -96,7 +96,7 @@ afterAll(async () => {
 	output(reports, 'josh');
 });
 
-describe('Integration tests - Game Room - Traditional initial territory claiming rule', () => {
+describe('Commands tests - Game Room - Traditional initial territory claiming rule', () => {
 	it('players register in game room', async () => {
 		for (const playerName of playerNames) {
 			await commands.RegisterPlayer({ playerName: playerName });
@@ -285,7 +285,7 @@ const script: Record<string, string[]> = {
 	'saul': ['Indonesia', 'Siam', 'Middle-East', 'India', 'Afghanistan', 'Ural', 'Yakutsk']
 };
 
-describe('Integration tests - Game Play - Traditional initial territory claiming rule', () => {
+describe('Commands tests - Game Play - Traditional initial territory claiming rule', () => {
 	let hostToken: string;
 	let gameToken: string;
 
