@@ -1,4 +1,17 @@
-export const QUERIES = [
+export const SELECTS = [
+['messages', 'Messages', `
+query Messages($commitId: String!) {
+  messages(commitId: $commitId) {
+    commitId
+    type
+    eventName
+    message
+    timestamp
+  }
+}`]
+];
+
+export const UPDATES = [
 ['registerPlayer', 'RegisterPlayer', `
 mutation RegisterPlayer($playerName: String!) {
 	registerPlayer(playerName: $playerName) {
@@ -27,21 +40,21 @@ mutation LeaveGameRoom {
 		}
 	}
 }`],
-];
-
-export const OPEN_GAME = `
-mutation OpenGame($playerToken: String!, $gameName: String!) {
-  openGame(playerToken: $playerToken, gameName: $gameName) {
+['openGame', 'OpenGame', `
+mutation OpenGame($gameName: String!, $ruleType: String!) {
+  openGame(gameName: $gameName, ruleType: $ruleType) {
     ... on Commit {
 			id
 			version
-			timestamp
+      timestamp
+      session
 		}
 		... on Error {
 			message
 		}
   }
-}`;
+}`],
+];
 
 export const JOIN_GAME = `
 mutation JoinGame($playerToken: String!, $gameToken: String!) {
