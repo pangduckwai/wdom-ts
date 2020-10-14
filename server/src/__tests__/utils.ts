@@ -1,5 +1,5 @@
-export const QUERIES = { 
-RegisterPlayer: ['registerPlayer', `
+export const QUERIES = [
+['registerPlayer', 'RegisterPlayer', `
 mutation RegisterPlayer($playerName: String!) {
 	registerPlayer(playerName: $playerName) {
 		... on Commit {
@@ -12,22 +12,22 @@ mutation RegisterPlayer($playerName: String!) {
 			message
 		}
 	}
-}`]
-};
-
-export const PLAYER_LEAVE = `
-mutation LeaveGameRoom($playerToken: String!) {
-	leaveGameRoom(playerToken: $playerToken) {
+}`],
+['leaveGameRoom', 'LeaveGameRoom', `
+mutation LeaveGameRoom {
+	leaveGameRoom {
 		... on Commit {
 			id
 			version
-			timestamp
+      timestamp
+      session
 		}
 		... on Error {
 			message
 		}
 	}
-}`;
+}`],
+];
 
 export const OPEN_GAME = `
 mutation OpenGame($playerToken: String!, $gameName: String!) {

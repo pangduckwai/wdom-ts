@@ -43,8 +43,12 @@ this script is called individually
 // KEYS[1] - Publish channel
 // KEYS[2] - Commit
 // KEYS[3] - Is Busy
+// KEYS[4] - Login (session -> token)
+// KEYS[5] - Login (token -> session)
 // ARGV[1] - Serialized commit object
 // ARGV[2] - Timestamp offset
+// ARGV[3] - Player Token
+// ARGV[4] - New session ID
 const put = `
 local sid = redis.call("xadd", KEYS[2], "*", "commit", ARGV[1])
 if sid then
@@ -57,29 +61,51 @@ if sid then
 		cnt = cnt + redis.call("xdel", KEYS[2], expire[i][1])
 	end
 
-	return sid
+	local auth = -1
+	local sssn = redis.call("hget", KEYS[5], ARGV[3])
+	if sssn then
+		redis.call("hdel", KEYS[4], sssn)
+		if redis.call("hset", KEYS[4], ARGV[4], ARGV[3]) >= 0 then
+			auth = redis.call("hset", KEYS[5], ARGV[3], ARGV[4])
+		end
+	else
+		if redis.call("hset", KEYS[4], ARGV[4], sid) >= 0 then
+			auth = redis.call("hset", KEYS[5], sid, ARGV[4])
+		end
+	end
+
+	if auth >= 0 then
+		return sid
+	else
+		return redis.error_reply("[CommitStore] error writing session")
+	end
 else
 	return redis.error_reply("[CommitStore] error writing commit")
 end`;
 
 export type CommitStore = {
-	put: (commit: Commit) => Promise<Commit>,
+	put: (commit: Commit, sessionId: string, playerToken: string) => Promise<Commit>,
 	get: (args?: { id?: string; from?: string; to?: string}) => Promise<Commit[]>
 };
 
 export const getCommitStore = (channel: string, client: Redis, ttl?: number): CommitStore => {
 	const _ttl = ttl ? ttl : 86400000; // 1 day == 24x60x60x1000 milliseconds
 	return {
-		put: (commit: Commit): Promise<Commit> => {
+		put: (commit: Commit, sessionId: string, playerToken?: string): Promise<Commit> => {
 			return new Promise<Commit>(async (resolve, reject) => {
 				const timestamp = Date.now();
 				const offset = '' + (timestamp - _ttl);
 				try {
-					const result = await client.eval(put, 3, [
+					const result = await client.eval(put, 5, [
 						channel,
 						`${channel}:Commit`,
 						`${channel}:Busy`,
-						JSON.stringify(commit), offset
+						`${channel}:Login`,
+						`${channel}:LoginRev`,
+						JSON.stringify(commit),
+						offset,
+						playerToken || '[none]',
+						sessionId
 					]);
 					if (result) {
 						commit.id = result;
@@ -140,8 +166,9 @@ export const createCommit = (): {
 				reject(new Error('[createCommit] Invalid parameter(s)'));
 			});
 		else {
+			const playerToken = commit.events[0].payload.playerToken || commit.events[0].payload.fromPlayer;
 			commit.session = generateToken(128);
-			return put(commit);
+			return put(commit, commit.session, playerToken);
 		}
 	}
 

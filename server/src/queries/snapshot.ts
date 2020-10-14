@@ -1,11 +1,10 @@
 import { Redis } from 'ioredis';
 import { Game, Player, isGame, isPlayer } from '../rules';
-import { deserialize, Status } from '..';
+import { deserialize } from '..';
 
-// KEYS[1]  - Player's session ID
-// KEYS[2]  - Player snapshots
-// KEYS[3]  - Game snapshots
-// KEYS[4]  - Is Busy
+// KEYS[1]  - Player snapshots
+// KEYS[2]  - Game snapshots
+// KEYS[3]  - Is Busy
 // ARGV[1]  - Number of player records (thus the rest are game records)
 // ARGV[2.. - Key value pair of token and serialized object
 const take = `
@@ -14,23 +13,20 @@ local count = 0
 
 redis.call("del", KEYS[1])
 redis.call("del", KEYS[2])
-redis.call("del", KEYS[3])
 
-for i = 2, ARGV[1], 3 do
+for i = 2, ARGV[1], 2 do
 	if redis.call("hset", KEYS[1], ARGV[i], ARGV[i+1]) >= 0 then
-		if redis.call("hset", KEYS[2], ARGV[i+1], ARGV[i+2]) >= 0 then
-			count = count + 1
-		end
-	end
-end
-
-for j = next, #ARGV, 2 do
-	if redis.call("hset", KEYS[3], ARGV[j], ARGV[j+1]) >= 0 then
 		count = count + 1
 	end
 end
 
-redis.call("del", KEYS[4])
+for j = next, #ARGV, 2 do
+	if redis.call("hset", KEYS[2], ARGV[j], ARGV[j+1]) >= 0 then
+		count = count + 1
+	end
+end
+
+redis.call("del", KEYS[3])
 return count`;
 
 // KEYS[1]  - Player's session ID
@@ -61,7 +57,6 @@ export type Snapshot = {
 		games: Record<string, Game>
 	}) => Promise<number>,
 	read: () => Promise<{
-		// logins: Record<string, string>,
 		players: Record<string, Player>,
 		games: Record<string, Game>
 	}>,
@@ -146,15 +141,13 @@ export const getSnapshot = (
 				const playerList = Object.values(players).filter(p => p.status !== 'Deleted').filter(p => !!p.sessionid);
 				const gameList = Object.values(games).filter(g => g.status !== 'Deleted');
 				const args = [
-					`${channel}:Login`,
 					`${channel}:Player`,
 					`${channel}:Game`,
 					`${channel}:Busy`,
-					playerList.length * 3
+					playerList.length * 2
 				];
 
 				for (const player of playerList) {
-					args.push(player.sessionid || '');
 					args.push(player.token);
 					args.push(JSON.stringify(player));
 				}
@@ -163,7 +156,7 @@ export const getSnapshot = (
 					args.push(JSON.stringify(game));
 				}
 
-				const result = await client.eval(take, 4, args);
+				const result = await client.eval(take, 3, args);
 				if (result === (playerList.length + gameList.length))
 					resolve(result);
 				else
@@ -190,7 +183,7 @@ export const getSnapshot = (
 				} else if ((players[logins[sessionId]].status !== 'New') && (players[logins[sessionId]].status !== 'Ready')) {
 					reject(`Invalid player (status: ${players[logins[sessionId]].status})`);
 				} else {
-					resolve({playerToken: logins[sessionId], players, games});
+					resolve({ playerToken: logins[sessionId], players, games });
 				}
 			});
 		}
