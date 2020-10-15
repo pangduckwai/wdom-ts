@@ -16,8 +16,8 @@ type Mutation {
 	leaveGameRoom: Response!
 	openGame(gameName: String!, ruleType: String!): Response!
 	closeGame: Response!
-	joinGame(playerToken: String!, gameToken: String!): Response!
-	quitGame(playerToken: String!): Response!
+	joinGame(gameToken: String!): Response!
+	quitGame: Response!
 	startGame(playerToken: String!, gameToken: String!): Response!
 	makeMove(
 		playerToken: String!
@@ -110,16 +110,22 @@ export const resolvers = {
 				return new ApolloError(error);
 			}
 		},
-		// joinGame: async (
-		// 	_: any, { playerToken, gameToken }: any, { client, channel }: CommandContext
-		// ): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.JoinGame({ playerToken, gameToken }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// quitGame: async (_: any,{ playerToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.QuitGame({ playerToken }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
+		joinGame: async (_: any, { gameToken }: any, { snapshot, commands, sessionId }: CommandContext): Promise<Commit | ApolloError> => {
+			try {
+				const { playerToken } = await snapshot.auth(sessionId);
+				return commands.JoinGame({ playerToken, gameToken });
+			} catch (error) {
+				return new ApolloError(error);
+			}
+		},
+		quitGame: async (_: any, __: any, { snapshot, commands, sessionId }: CommandContext): Promise<Commit | ApolloError> => {
+			try {
+				const { playerToken } = await snapshot.auth(sessionId);
+				return commands.QuitGame({ playerToken });
+			} catch (error) {
+				return new ApolloError(error);
+			}
+		},
 		// startGame: async (_: any,{ playerToken, gameToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
 		// 	CommitStore(client).put(channel, Commands.StartGame({ playerToken, gameToken }))
 		// 		.then(result => result)

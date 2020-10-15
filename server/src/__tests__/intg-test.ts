@@ -1,5 +1,6 @@
 require('dotenv').config();
 import fetch from 'node-fetch';
+import { hostname } from 'os';
 import { commandService } from '../commands';
 import { queryService } from '../queries';
 import { SELECTS, UPDATES } from './utils';
@@ -77,7 +78,7 @@ const getHeaders = (playerName?: string) => {
 	return headers;
 };
 
-describe('Integration test', () => {
+describe('Integration test - commands', () => {
 	it('players register in game room', async () => {
 		for (const playerName of Object.keys(playerSessions).filter(p => p !== 'paul')) {
 			await fetch(cmdUrl, {
@@ -135,6 +136,7 @@ describe('Integration test', () => {
 		if (cerrors) {
 			console.log('add duplicated player name (commands)', cerrors);
 			expect(false).toBeTruthy();
+			return;
 		}
 
 		const commitId = cdata[UPDATES[0][0]].id;
@@ -192,4 +194,174 @@ describe('Integration test', () => {
 			});
 		}
 	});
+
+	it('players join games', async () => {
+		for (const hostName of Object.keys(gameList)) {
+			let txt = '';
+			for (const playerName of gameList[hostName].members) {
+				await fetch(cmdUrl, {
+					method: 'POST', headers: getHeaders(playerName),
+					body: JSON.stringify({ operationName: UPDATES[4][1], query: UPDATES[4][2], variables: { gameToken: gameList[hostName].token }})
+				}).then(res => {
+					return res.json();
+				}).then(({ data, errors }) => {
+					if (errors) {
+						console.log('players join games', errors);
+						expect(false).toBeTruthy();
+					} else {
+						playerSessions[playerName].session = data[UPDATES[4][0]].session;
+						expect(data[UPDATES[4][0]].session).toBeTruthy();
+					}
+				}).catch(error => {
+					console.log(error);
+					expect(false).toBeTruthy();
+				});
+			}
+		}
+	});
+
+	it('player join his/her own game', async () => {
+		const { data: cdata, errors: cerrors } = await fetch(cmdUrl, {
+			method: 'POST', headers: getHeaders('pete'),
+			body: JSON.stringify({ operationName: UPDATES[4][1], query: UPDATES[4][2], variables: { gameToken: gameList['pete'].token }})
+		}).then(res => {
+			return res.json();
+		}).catch(error => {
+			console.log(error);
+			expect(false).toBeTruthy();
+		});
+		if (cerrors) {
+			console.log('player join his/her own game (commands)', cerrors);
+			expect(false).toBeTruthy();
+			return;
+		}
+
+		playerSessions['pete'].session = cdata[UPDATES[4][0]].session;
+		const commitId = cdata[UPDATES[4][0]].id;
+		await fetch(qryUrl, {
+			method: 'POST', headers: getHeaders('pete'),
+			body: JSON.stringify({ operationName: SELECTS[0][1], query: SELECTS[0][2], variables: { commitId }})
+		}).then(res => {
+			return res.json();
+		}).then(({ data, errors }) => {
+			if (errors) {
+				console.log('player join his/her own game (queries)', errors);
+				expect(false).toBeTruthy();
+			} else {
+				expect(data[SELECTS[0][0]][0].message).toEqual('[pete] cannot join your own game');
+			}
+		}).catch(error => {
+			console.log(error);
+			expect(false).toBeTruthy();
+		});
+	});
+
+	it('player close game', async () => {
+		await fetch(cmdUrl, {
+			method: 'POST', headers: getHeaders('saul'),
+			body: JSON.stringify({ operationName: UPDATES[3][1], query: UPDATES[3][2], variables: {}})
+		}).then(res => {
+			return res.json();
+		}).then(({ data, errors }) => {
+			if (errors) {
+				console.log('player close game', errors);
+				expect(false).toBeTruthy();
+			} else {
+				playerSessions['saul'].session = data[UPDATES[3][0]].session;
+				expect(data[UPDATES[3][0]].session).toBeTruthy();
+			}
+		}).catch(error => {
+			console.log(error);
+			expect(false).toBeTruthy();
+		});
+	});
+
+	it('non-host player try to close a game', async () => {
+		const { data: cdata, errors: cerrors } = await fetch(cmdUrl, {
+			method: 'POST', headers: getHeaders('matt'),
+			body: JSON.stringify({ operationName: UPDATES[3][1], query: UPDATES[3][2], variables: {}})
+		}).then(res => {
+			return res.json();
+		}).catch(error => {
+			console.log(error);
+			expect(false).toBeTruthy();
+		});
+		if (cerrors) {
+			console.log('non-host player try to close a game (commands)', cerrors);
+			expect(false).toBeTruthy();
+			return;
+		}
+
+		playerSessions['matt'].session = cdata[UPDATES[3][0]].session;
+		const commitId = cdata[UPDATES[3][0]].id;
+		await fetch(qryUrl, {
+			method: 'POST', headers: getHeaders('matt'),
+			body: JSON.stringify({ operationName: SELECTS[0][1], query: SELECTS[0][2], variables: { commitId }})
+		}).then(res => {
+			return res.json();
+		}).then(({ data, errors }) => {
+			if (errors) {
+				console.log('non-host player try to close a game (queries)', errors);
+				expect(false).toBeTruthy();
+			} else {
+				expect(data[SELECTS[0][0]][0].message).toEqual('[matt] is not the host of game "josh\'s game"');
+			}
+		}).catch(error => {
+			console.log(error);
+			expect(false).toBeTruthy();
+		});
+	});
+});
+
+describe('Integration test - queries', () => {
+	it('query registered players', async () => {
+		const results: string[] = [];
+		for (const playerName of Object.keys(playerSessions).filter(p => playerSessions[p].token && playerSessions[p].session)) {
+			await fetch(qryUrl, {
+				method: 'POST', headers: getHeaders(playerName),
+				body: JSON.stringify({ operationName: SELECTS[1][1], query: SELECTS[1][2], variables: {}})
+			}).then(res => {
+				return res.json();
+			}).then(({ data, errors }) => {
+				if (errors) {
+					console.log('query registered players', errors);
+					expect(false).toBeTruthy();
+				} else {
+					results.push(JSON.stringify(data[SELECTS[1][0]]));
+					expect(data[SELECTS[1][0]].name).toEqual(playerName);
+					expect(data[SELECTS[1][0]].status).toEqual('New');
+				}
+			}).catch(error => {
+				console.log(error);
+				expect(false).toBeTruthy();
+			});
+		}
+		console.log(results);
+	});
+
+// 	it('query opened games', async () => {
+// 		const results: string[] = [];
+// 		for (const hostName of Object.keys(gameList)) {
+// 			await fetch(qryUrl, {
+// 				method: 'POST', headers: getHeaders(hostName),
+// 				body: JSON.stringify({ operationName: SELECTS[2][1], query: SELECTS[2][2], variables: {}})
+// 			}).then(res => {
+// 				return res.json();
+// 			}).then(({ data, errors }) => {
+// 				if (errors) {
+// 					console.log('query opened games', errors);
+// 					expect(false).toBeTruthy();
+// 				} else {
+// 					const { players, ...rest } = data[SELECTS[2][0]];
+// 					results.push(JSON.stringify(rest));
+// 					expect(data[SELECTS[2][0]].name).toEqual(gameList[hostName].name);
+// 					expect(data[SELECTS[2][0]].status).toEqual('New');
+// 				}
+// 			}).catch(error => {
+// 				console.log(error);
+// 				expect(false).toBeTruthy();
+// 			});
+// 		}
+// 		console.log(results);
+// 	});
 });

@@ -8,10 +8,50 @@ query Messages($commitId: String!) {
     message
     timestamp
   }
+}`],
+['me', 'Me', `
+query Me {
+  me {
+    token
+    name
+    status
+    reinforcement
+    selected
+    joined
+    cards
+    holdings {
+      name
+      troop
+    }
+  }
+}`],
+['myGame', 'MyGame', `
+query MyGame {
+  myGame {
+    token
+    name
+    status
+    round
+    turns
+    players {
+      token
+      name
+      status
+      selected
+      joined
+      holdings {
+        name
+        troop
+      }
+    }
+    lastBattleR
+    lastBattleW
+  }
 }`]
 ];
 
 export const UPDATES = [
+// 0
 ['registerPlayer', 'RegisterPlayer', `
 mutation RegisterPlayer($playerName: String!) {
 	registerPlayer(playerName: $playerName) {
@@ -25,7 +65,7 @@ mutation RegisterPlayer($playerName: String!) {
 			message
 		}
 	}
-}`],
+}`], // 1
 ['leaveGameRoom', 'LeaveGameRoom', `
 mutation LeaveGameRoom {
 	leaveGameRoom {
@@ -39,7 +79,7 @@ mutation LeaveGameRoom {
 			message
 		}
 	}
-}`],
+}`], // 2
 ['openGame', 'OpenGame', `
 mutation OpenGame($gameName: String!, $ruleType: String!) {
   openGame(gameName: $gameName, ruleType: $ruleType) {
@@ -53,50 +93,50 @@ mutation OpenGame($gameName: String!, $ruleType: String!) {
 			message
 		}
   }
+}`], // 3
+['closeGame', 'CloseGame', `
+mutation CloseGame {
+  closeGame {
+    ... on Commit {
+			id
+			version
+      timestamp
+      session
+		}
+		... on Error {
+			message
+		}
+  }
+}`], // 4
+['joinGame', 'JoinGame', `
+mutation JoinGame($gameToken: String!) {
+  joinGame(gameToken: $gameToken) {
+    ... on Commit {
+			id
+			version
+      timestamp
+      session
+		}
+		... on Error {
+			message
+		}
+  }
+}`], // 5
+['quitGame', 'QuitGame', `
+mutation QuitGame {
+  quitGame {
+    ... on Commit {
+			id
+			version
+			timestamp
+      session
+		}
+		... on Error {
+			message
+		}
+  }
 }`],
 ];
-
-export const JOIN_GAME = `
-mutation JoinGame($playerToken: String!, $gameToken: String!) {
-  joinGame(playerToken: $playerToken, gameToken: $gameToken) {
-    ... on Commit {
-			id
-			version
-			timestamp
-		}
-		... on Error {
-			message
-		}
-  }
-}`;
-
-export const CLOSE_GAME = `
-mutation CloseGame($playerToken: String!, $gameToken: String!) {
-  closeGame(playerToken: $playerToken, gameToken: $gameToken) {
-    ... on Commit {
-			id
-			version
-			timestamp
-		}
-		... on Error {
-			message
-		}
-  }
-}`;
-
-export const QUIT_GAME = `
-mutation QuitGame($playerToken: String!, $gameToken: String!) {
-  quitGame(playerToken: $playerToken, gameToken: $gameToken) {
-    ... on Commit {
-			id
-			version
-			timestamp
-		}
-		... on Error {
-			message
-		}
-  }
-}`;
 
 export const START_GAME = `
 mutation StartGame($playerToken: String!, $gameToken: String!) {
