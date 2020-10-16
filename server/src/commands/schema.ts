@@ -18,7 +18,7 @@ type Mutation {
 	closeGame: Response!
 	joinGame(gameToken: String!): Response!
 	quitGame: Response!
-	startGame(playerToken: String!, gameToken: String!): Response!
+	startGame: Response!
 	makeMove(
 		playerToken: String!
 		gameToken: String!
@@ -126,10 +126,18 @@ export const resolvers = {
 				return new ApolloError(error);
 			}
 		},
-		// startGame: async (_: any,{ playerToken, gameToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.StartGame({ playerToken, gameToken }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
+		startGame: async (_: any, __: any, { snapshot, commands, sessionId }: CommandContext): Promise<Commit | ApolloError> => {
+			try {
+				const { playerToken, players } = await snapshot.auth(sessionId);
+				const gameToken = players[playerToken].joined;
+				if (gameToken)
+					return commands.StartGame({ playerToken, gameToken });
+				else
+					return new ApolloError('Player not in any game yet');
+			} catch (error) {
+				return new ApolloError(error);
+			}
+		},
 		// selectTerritory: async (
 		// 	_: any, { playerToken, gameToken, territoryName }: any, { client, channel }: CommandContext
 		// ): Promise<Commit | Error> =>

@@ -135,22 +135,22 @@ mutation QuitGame {
 			message
 		}
   }
-}`],
-];
-
-export const START_GAME = `
-mutation StartGame($playerToken: String!, $gameToken: String!) {
-  startGame(playerToken: $playerToken, gameToken: $gameToken) {
+}`], // 6
+['startGame', 'StartGame', `
+mutation StartGame {
+  startGame {
     ... on Commit {
 			id
 			version
 			timestamp
+      session
 		}
 		... on Error {
 			message
 		}
   }
-}`;
+}`],
+];
 
 export const ASSIGN_TERRITORY = `
 mutation AssignTerritory($playerToken: String!, $gameToken: String!, $territoryName: String!) {

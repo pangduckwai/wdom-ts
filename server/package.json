@@ -4,9 +4,8 @@
 	"description": "World Domination the Game",
 	"main": "dist/server.js",
 	"cfg": {
-		"c": "E:/HOME/_tools/PuTTy/pscp.exe -load dev",
-		"r": "E:/HOME/_tools/PuTTy/pscp.exe -load dev -r",
-		"s": "192.168.14.167",
+		"c": "pscp -load dev",
+		"r": "pscp -load dev -r",
 		"p": "proj/wdom-ts/server"
 	},
 	"scripts": {
@@ -26,7 +25,7 @@
 		"cp-s": "%npm_package_cfg_r% src %DEST%/",
 		"cp-e": "%npm_package_cfg_c% .env.lo %DEST%/.env",
 		"cp-p": "%npm_package_cfg_c% pkg-linux.json %DEST%/package.json",
-		"copy": "set DEST=%USERNAME%@%npm_package_cfg_s%:/home/%USERNAME%/%npm_package_cfg_p%&& npm run cp-s && npm run cp-m && npm run cp-e && npm run cp-p"
+		"copy": "set DEST=%USERNAME%@%DEV_SERVER%:/home/%USERNAME%/%npm_package_cfg_p%&& npm run cp-s && npm run cp-m && npm run cp-e && npm run cp-p"
 	},
 	"repository": "https://github.com/pangduckwai/wdom-ts.git",
 	"author": "paul.lai@sea9.org",

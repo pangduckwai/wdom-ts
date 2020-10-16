@@ -173,7 +173,7 @@ export const reducer = (
 							messages.push(buildMessage(commit.id, MessageType.Error, event.type, error));
 						} else {
 							if (games[event.payload.gameToken].host === event.payload.playerToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] cannot join your own game`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] don't need to join one's own game`));
 							}if (players[event.payload.playerToken].joined) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] already joined game "${players[event.payload.playerToken].joined}"`));
 							} else {
@@ -197,7 +197,7 @@ export const reducer = (
 							if (!joinedToken) {
 								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] is not in any game currently`));
 							} else if (games[joinedToken].host === event.payload.playerToken) {
-								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] cannot quit from the game you are hosting`));
+								messages.push(buildMessage(commit.id, MessageType.Error, event.type, `[${players[event.payload.playerToken].name}] cannot quit from the game one is hosting`));
 							} else {
 								players[event.payload.playerToken].joined = undefined;
 								games[joinedToken].players = games[joinedToken].players.filter(p => p !== event.payload.playerToken);

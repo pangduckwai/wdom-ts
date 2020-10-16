@@ -179,7 +179,7 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		await commands.JoinGame({ playerToken, gameToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await messages() };
-		expect(reports.messages.filter(m => m.message === '[pete] cannot join your own game').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[pete] don\'t need to join one\'s own game').length).toEqual(1);
 	});
 
 	it('player close game', async () => {
@@ -239,7 +239,7 @@ describe('Integration tests - Use random initial territory assignment rule', () 
 		await commands.QuitGame({ playerToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await messages() };
-		expect(reports.messages.filter(m => m.message === '[pete] cannot quit from the game you are hosting').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[pete] cannot quit from the game one is hosting').length).toEqual(1);
 	});
 
 	it('player not in a game try to quit game', async () => {

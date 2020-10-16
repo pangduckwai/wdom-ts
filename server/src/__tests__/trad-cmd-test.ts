@@ -170,7 +170,7 @@ describe('Commands tests - Game Room - Traditional initial territory claiming ru
 		await commands.JoinGame({ playerToken, gameToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await messages() };
-		expect(reports.messages.filter(m => m.message === '[pete] cannot join your own game').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[pete] don\'t need to join one\'s own game').length).toEqual(1);
 	});
 
 	it('player close game', async () => {
@@ -230,7 +230,7 @@ describe('Commands tests - Game Room - Traditional initial territory claiming ru
 		await commands.QuitGame({ playerToken });
 		const { players, games } = await snapshot.read();
 		reports = { players, games, messages: await messages() };
-		expect(reports.messages.filter(m => m.message === '[pete] cannot quit from the game you are hosting').length).toEqual(1);
+		expect(reports.messages.filter(m => m.message === '[pete] cannot quit from the game one is hosting').length).toEqual(1);
 	});
 
 	it('player not in a game try to quit game', async () => {
@@ -285,7 +285,7 @@ const script: Record<string, string[]> = {
 	'saul': ['Indonesia', 'Siam', 'Middle-East', 'India', 'Afghanistan', 'Ural', 'Yakutsk']
 };
 
-describe('Commands tests - Game Play - Traditional initial territory claiming rule', () => {
+describe('Commands tests - Game play - Traditional initial territory claiming rule', () => {
 	let hostToken: string;
 	let gameToken: string;
 
