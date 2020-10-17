@@ -20,19 +20,15 @@ type Mutation {
 	quitGame: Response!
 	startGame: Response!
 	makeMove(
-		playerToken: String!
-		gameToken: String!
 		territoryName: String!
 		flag: Int!
 	): Response!
+	endTurn: Response!
 	fortify(
-		playerToken: String!
-		gameToken: String!
 		territoryName: String!
 		amount: Int!
 	): Response!
-	endTurn(playerToken: String!, gameToken: String!): Response!
-	redeemCards(playerToken: String!, gameToken: String!, cardNames: [String!]!): Response!
+	redeemCards(cardNames: [String!]!): Response!
 }
 
 type Event {
@@ -76,10 +72,13 @@ export const resolvers = {
 		},
 	},
 	Mutation: {
-    registerPlayer: async (_: any, { playerName }: any, { commands }: CommandContext): Promise<Commit | ApolloError> =>
-			commands.RegisterPlayer({ playerName })
-				.then(result => result)
-				.catch(error => new ApolloError(error)),
+    registerPlayer: async (_: any, { playerName }: any, { commands }: CommandContext): Promise<Commit | ApolloError> => {
+			try {
+				return commands.RegisterPlayer({ playerName })
+			} catch (error) {
+				return new ApolloError(error);
+			}
+		},
 		leaveGameRoom: async (_: any, __: any, { snapshot, commands, sessionId }: CommandContext): Promise<Commit | ApolloError> => {
 			try {
 				const { playerToken } = await snapshot.auth(sessionId);
@@ -138,67 +137,60 @@ export const resolvers = {
 				return new ApolloError(error);
 			}
 		},
-		// selectTerritory: async (
-		// 	_: any, { playerToken, gameToken, territoryName }: any, { client, channel }: CommandContext
-		// ): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.SelectTerritory({ playerToken, gameToken, territoryName }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// attackTerritory: async (
-		// 	_: any, { playerToken, gameToken, fromTerritory, toTerritory, attackerLoss, defenderLoss }: any, { client, channel }: CommandContext
-		// ): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.AttackTerritory({
-		// 			playerToken, gameToken, fromTerritory, toTerritory, attackerLoss, defenderLoss
-		// 	})).then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// conquerTerritory: async (
-		// 	_: any, { fromPlayer, toPlayer, gameToken, fromTerritory, toTerritory }: any, { client, channel }: CommandContext
-		// ): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.ConquerTerritory({ fromPlayer, toPlayer, gameToken, fromTerritory, toTerritory }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// fortify: async (
-		// 	_: any, { playerToken, gameToken, fromTerritory, toTerritory, amount }: any, { client, channel }: CommandContext
-		// ): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.Fortify({ playerToken, gameToken, fromTerritory, toTerritory, amount }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// defeatPlayer: async (_: any, { fromPlayer, toPlayer, gameToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.DefeatPlayer({ fromPlayer, toPlayer, gameToken }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// placeTroop: async (
-		// 	_: any, { playerToken, gameToken, territoryName, amount }: any, { client, channel }: CommandContext
-		// ): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.PlaceTroop({ playerToken, gameToken, territoryName, amount }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// nextPlayer: async (_: any, { fromPlayer, toPlayer, gameToken }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.NextPlayer({ fromPlayer, toPlayer, gameToken }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// finishSetup: async (
-		// 	_: any, { playerToken, gameToken }: any, { client, channel }: CommandContext
-		// ): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.FinishSetup({ playerToken, gameToken }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// endTurn: async (
-		// 	_: any, { playerToken, gameToken }: any, { client, channel }: CommandContext
-		// ): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.EndTurn({ playerToken, gameToken }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// redeemCards: async (_: any, { playerToken, gameToken, cardNames }: any, { client, channel }: CommandContext): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.RedeemCards({ playerToken, gameToken, cardNames }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
-		// winGame: async (
-		// 	_: any, { playerToken, gameToken }: any, { client, channel }: CommandContext
-		// ): Promise<Commit | Error> =>
-		// 	CommitStore(client).put(channel, Commands.WinGame({ playerToken, gameToken }))
-		// 		.then(result => result)
-		// 		.catch(error => new ApolloError(error)),
+		makeMove: async (
+			_: any, { territoryName, flag }: any, { snapshot, commands, sessionId }: CommandContext
+		): Promise<Commit | ApolloError> => {
+			try {
+				const { playerToken, players } = await snapshot.auth(sessionId);
+				const gameToken = players[playerToken].joined;
+				if (gameToken)
+					return commands.MakeMove({ playerToken, gameToken, territoryName, flag });
+				else
+					return new ApolloError('Player not in any game yet');
+			} catch (error) {
+				return new ApolloError(error);
+			}
+		},
+		endTurn: async (_: any, __: any, { snapshot, commands, sessionId }: CommandContext): Promise<Commit | ApolloError> => {
+			try {
+				const { playerToken, players } = await snapshot.auth(sessionId);
+				const gameToken = players[playerToken].joined;
+				if (gameToken)
+					return commands.EndTurn({ playerToken, gameToken });
+				else
+					return new ApolloError('Player not in any game yet');
+			} catch (error) {
+				return new ApolloError(error);
+			}
+		},
+		fortify: async (
+			_: any, { territoryName, amount }: any, { snapshot, commands, sessionId }: CommandContext
+		): Promise<Commit | Error> =>{
+			try {
+				const { playerToken, players } = await snapshot.auth(sessionId);
+				const gameToken = players[playerToken].joined;
+				if (gameToken)
+					return commands.FortifyPosition({ playerToken, gameToken, territoryName, amount });
+				else
+					return new ApolloError('Player not in any game yet');
+			} catch (error) {
+				return new ApolloError(error);
+			}
+		},
+		redeemCards: async (
+			_: any, { cardNames }: any, { snapshot, commands, sessionId }: CommandContext
+		): Promise<Commit | Error> =>{
+			try {
+				const { playerToken, players } = await snapshot.auth(sessionId);
+				const gameToken = players[playerToken].joined;
+				if (gameToken)
+					return commands.RedeemCards({ playerToken, gameToken, cardNames });
+				else
+					return new ApolloError('Player not in any game yet');
+			} catch (error) {
+				return new ApolloError(error);
+			}
+		},
 	},
 };
 

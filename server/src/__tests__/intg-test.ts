@@ -113,7 +113,7 @@ const gameList: Record<string, {
 }> = {
 	'pete': { token: '', name: 'pete\'s game', members: ['jess']},
 	'josh': { token: '', name: 'josh\'s game', members: ['matt']},
-	'saul': { token: '', name: 'saul\'s game', members: ['nick', 'mike', 'john']}
+	'saul': { token: '', name: 'saul\'s game', members: ['john', 'mike', 'nick']} // TODO: check why need to reverse order in trad-cmd-test to get the same player order...
 };
 
 const getHeaders = (playerName?: string) => {
@@ -558,6 +558,15 @@ describe('Integration test - Game Room', () => {
 		});
 	});
 });
+
+const script: Record<string, string[]> = {
+	'matt': ['Western-Australia', 'Eastern-Australia', 'New-Guinea', 'China', 'Manchuria', 'Japan', 'Kamchatka'],
+	'josh': ['Peru', 'Argentina', 'Brazil', 'Western-United-States', 'Alberta', 'Northwest-Territory', 'Alaska'],
+	'john': ['Congo', 'South-Africa', 'Madagascar', 'Southern-Europe', 'Ukraine', 'Scandinavia', 'Iceland'],
+	'mike': ['East-Africa', 'North-Africa', 'Egypt', 'Western-Europe', 'Northern-Europe', 'Great-Britain', 'Irkutsk'],
+	'nick': ['Venezuela', 'Mexico', 'Eastern-United-States', 'Ontario', 'Quebec', 'Greenland', 'Siberia'],
+	'saul': ['Indonesia', 'Siam', 'Middle-East', 'India', 'Afghanistan', 'Ural', 'Yakutsk']
+};
 
 describe('Integration test - Game play', () => {
 });
