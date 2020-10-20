@@ -42,7 +42,8 @@
 		"rxjs": "^6.6.0",
 		"subscriptions-transport-ws": "^0.9.16",
 		"typescript": "^3.9.6",
-		"utf-8-validate": "^5.0.2"
+		"utf-8-validate": "^5.0.2",
+		"object-path": ">=0.11.5"
 	},
 	"devDependencies": {
 		"@types/jest": "^26.0.10",
