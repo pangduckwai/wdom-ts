@@ -21,7 +21,7 @@ describe('Export constructs', () => {
         connected += `${(!connected) ? '' : ', '}${territories.findIndex(t => t.name === territory)}`;
         comment += ` ${territory}`;
       }
-      output += `Territory{${i}, 0, ${world.findIndex(c => c.name === territories[i].continent)}, "${territories[i].name}", []uint8{${connected}}}, // ${comment}\n`;
+      output += `Territory{${i}, ${world.findIndex(c => c.name === territories[i].continent)}, "${territories[i].name}", []uint8{${connected}}}, // ${comment}\n`;
     } 
     console.log(output);
   });
