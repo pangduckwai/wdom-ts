@@ -18,6 +18,7 @@
 		"rand-cmd-test": "jest rand-cmd-test",
 		"trad-cmd-test": "jest trad-cmd-test",
 		"intg-test": "jest intg-test",
+		"export": "jest export-test",
 		"command": "node dist/service-cmds.js %TS%",
 		"queries": "node dist/service-qrys.js %TS%",
 		"start": "npm run build && set TS=%DATE: =-%@%TIME: =0% && concurrently \"npm:command\" \"npm:queries\"",
