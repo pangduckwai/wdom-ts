@@ -5,7 +5,7 @@ describe('Export constructs', () => {
     const continents = Object.values(buildWorld());
     let output = ''
     for (let i = 0; i < continents.length; i++) {
-      output += `Continent{${i}, ${continents[i].reinforcement}}, // ${continents[i].name}\n`
+      output += `Continent{${i}, ${continents[i].reinforcement}, "${continents[i].name}"},\n`
     }
     console.log(output)
   });
@@ -21,7 +21,7 @@ describe('Export constructs', () => {
         connected += `${(!connected) ? '' : ', '}${territories.findIndex(t => t.name === territory)}`;
         comment += ` ${territory}`;
       }
-      output += `Territory{${i}, 0, ${world.findIndex(c => c.name === territories[i].continent)}, []uint8{${connected}}}, // ${territories[i].name} -> ${comment}\n`;
+      output += `Territory{${i}, 0, ${world.findIndex(c => c.name === territories[i].continent)}, "${territories[i].name}", []uint8{${connected}}}, // ${comment}\n`;
     } 
     console.log(output);
   });
@@ -30,7 +30,7 @@ describe('Export constructs', () => {
     const deck = Object.values(buildDeck());
     let output = '';
     for (let i = 0; i < deck.length; i++) {
-      output += `Card{${i}, ${CardTypes.findIndex(c => c === deck[i].type)}}, // ${deck[i].name} (${deck[i].type})\n`;
+      output += `Card{${i}, ${CardTypes.findIndex(c => c === deck[i].type)}, "${deck[i].name}"}, // ${deck[i].type}\n`;
     }
     console.log(output);
   });
